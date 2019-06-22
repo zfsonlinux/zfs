@@ -272,6 +272,13 @@ extern void zfs_log_link(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
     znode_t *dzp, znode_t *zp, const char *name);
 extern void zfs_log_symlink(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
     znode_t *dzp, znode_t *zp, const char *name, const char *link);
+extern void zfs_log_rename_exchange(zilog_t *zilog, dmu_tx_t *tx,
+    uint64_t txtype, znode_t *sdzp, const char *sname, znode_t *tdzp,
+    const char *dname, znode_t *szp);
+extern void zfs_log_rename_whiteout(zilog_t *zilog, dmu_tx_t *tx,
+    uint64_t txtype, znode_t *sdzp, const char *sname, znode_t *tdzp,
+    const char *dname, znode_t *szp, znode_t *wzp, vsecattr_t *vsecp,
+    zfs_fuid_info_t *fuidp, vattr_t *vap);
 extern void zfs_log_rename(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
     znode_t *sdzp, const char *sname, znode_t *tdzp, const char *dname,
     znode_t *szp);
