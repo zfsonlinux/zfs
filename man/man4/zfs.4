@@ -2073,6 +2073,10 @@ Limit SLOG write size per commit executed with synchronous priority.
 Any writes above that will be executed with lower (asynchronous) priority
 to limit potential SLOG device abuse by single active ZIL writer.
 .
+.It Sy zfs_zil_saxattr_enabled Ns = Ns Sy 1 Pq int
+Enable xattr=sa extended attribute logging in zil.
+Setting value to 0 disables xattr=sa logging in zil.
+.
 .It Sy zfs_embedded_slog_min_ms Ns = Ns Sy 64  Pq int
 Usually, one metaslab from each normal-class vdev is dedicated for use by
 the ZIL to log synchronous writes.

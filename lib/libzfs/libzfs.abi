@@ -347,7 +347,7 @@
     <elf-symbol name='fletcher_4_superscalar4_ops' size='64' type='object-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='fletcher_4_superscalar_ops' size='64' type='object-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='libzfs_config_ops' size='16' type='object-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
-    <elf-symbol name='spa_feature_table' size='1904' type='object-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
+    <elf-symbol name='spa_feature_table' size='1960' type='object-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='zfeature_checks_disable' size='4' type='object-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='zfs_deleg_perm_tab' size='512' type='object-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='zfs_history_event_names' size='328' type='object-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
@@ -4396,7 +4396,8 @@
       <enumerator name='SPA_FEATURE_DEVICE_REBUILD' value='31'/>
       <enumerator name='SPA_FEATURE_ZSTD_COMPRESS' value='32'/>
       <enumerator name='SPA_FEATURE_DRAID' value='33'/>
-      <enumerator name='SPA_FEATURES' value='34'/>
+      <enumerator name='SPA_FEATURE_ZILSAXATTR' value='34'/>
+      <enumerator name='SPA_FEATURES' value='35'/>
     </enum-decl>
     <pointer-type-def type-id='type-id-328' size-in-bits='64' id='type-id-329'/>
     <function-decl name='zfeature_lookup_name' visibility='default' binding='global' size-in-bits='64'>
@@ -6712,8 +6713,8 @@
     <pointer-type-def type-id='type-id-463' size-in-bits='64' id='type-id-460'/>
     <typedef-decl name='zfeature_info_t' type-id='type-id-456' id='type-id-464'/>
 
-    <array-type-def dimensions='1' type-id='type-id-464' size-in-bits='15232' id='type-id-465'>
-      <subrange length='34' type-id='type-id-33' id='type-id-395'/>
+    <array-type-def dimensions='1' type-id='type-id-464' size-in-bits='15680' id='type-id-465'>
+      <subrange length='35' type-id='type-id-33' id='type-id-395'/>
 
     </array-type-def>
     <var-decl name='spa_feature_table' type-id='type-id-465' mangled-name='spa_feature_table' visibility='default' elf-symbol-id='spa_feature_table'/>

@@ -27,8 +27,10 @@
 #include <sys/sa.h>
 #include <sys/zfs_acl.h>
 #include <sys/zfs_sa.h>
+#include <sys/fs/zfs.h>
 #include <sys/dmu_objset.h>
 #include <sys/sa_impl.h>
+#include <sys/zfeature.h>
 
 /*
  * ZPL attribute registration table.
@@ -68,6 +70,8 @@ sa_attr_reg_t zfs_attr_table[ZPL_END+1] = {
 	{"ZPL_PROJID", sizeof (uint64_t), SA_UINT64_ARRAY, 0},
 	{NULL, 0, 0, 0}
 };
+
+int zfs_zil_saxattr_enabled = 1;
 
 #ifdef _KERNEL
 int
@@ -219,13 +223,14 @@ zfs_sa_get_xattr(znode_t *zp)
 }
 
 int
-zfs_sa_set_xattr(znode_t *zp)
+zfs_sa_set_xattr(znode_t *zp, const char *name, const void *value, size_t vsize)
 {
 	zfsvfs_t *zfsvfs = ZTOZSB(zp);
+	zilog_t *zilog;
 	dmu_tx_t *tx;
 	char *obj;
 	size_t size;
-	int error;
+	int error, logsaxattr = 0;
 
 	ASSERT(RW_WRITE_HELD(&zp->z_xattr_lock));
 	ASSERT(zp->z_xattr_cached);
@@ -244,6 +249,11 @@ zfs_sa_set_xattr(znode_t *zp)
 	if (error)
 		goto out_free;
 
+	zilog = zfsvfs->z_log;
+	if (spa_feature_is_active(zfsvfs->z_os->os_spa,
+	    SPA_FEATURE_ZILSAXATTR) && zfs_zil_saxattr_enabled)
+		logsaxattr = 1;
+
 	tx = dmu_tx_create(zfsvfs->z_os);
 	dmu_tx_hold_sa_create(tx, size);
 	dmu_tx_hold_sa(tx, zp->z_sa_hdl, B_TRUE);
@@ -256,6 +266,10 @@ zfs_sa_set_xattr(znode_t *zp)
 		sa_bulk_attr_t bulk[2];
 		uint64_t ctime[2];
 
+		if (logsaxattr)
+			zfs_log_setsaxattr(zilog, tx, TX_SETSAXATTR, zp, name,
+			    value, vsize);
+
 		zfs_tstamp_update_setup(zp, STATE_CHANGED, NULL, ctime);
 		SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_DXATTR(zfsvfs),
 		    NULL, obj, size);
@@ -264,6 +278,8 @@ zfs_sa_set_xattr(znode_t *zp)
 		VERIFY0(sa_bulk_update(zp->z_sa_hdl, bulk, count, tx));
 
 		dmu_tx_commit(tx);
+		if (logsaxattr && zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
+			zil_commit(zilog, 0);
 	}
 out_free:
 	vmem_free(obj, size);
@@ -432,6 +448,9 @@ zfs_sa_upgrade_txholds(dmu_tx_t *tx, znode_t *zp)
 		    DMU_OBJECT_END);
 	}
 }
+
+ZFS_MODULE_PARAM(zfs, zfs_, zil_saxattr_enabled, INT, ZMOD_RW,
+	"Enable xattr=sa extended attribute logging in zil.");
 
 EXPORT_SYMBOL(zfs_attr_table);
 EXPORT_SYMBOL(zfs_sa_readlink);
