@@ -23,6 +23,7 @@
  * Copyright (c) 2011, 2019 by Delphix. All rights reserved.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2017, Intel Corporation.
+ * Copyright (c) 2020 by George Melikov. All rights reserved.
  */
 
 #include <sys/sysmacros.h>
@@ -1676,7 +1677,8 @@ zio_write_compress(zio_t *zio)
 	if (compress != ZIO_COMPRESS_OFF &&
 	    !(zio->io_flags & ZIO_FLAG_RAW_COMPRESS)) {
 		void *cbuf = zio_buf_alloc(lsize);
-		psize = zio_compress_data(compress, zio->io_abd, cbuf, lsize);
+		psize = zio_compress_data(compress, zio->io_abd, cbuf, lsize,
+		    spa->spa_max_ashift);
 		if (psize == 0 || psize == lsize) {
 			compress = ZIO_COMPRESS_OFF;
 			zio_buf_free(cbuf, lsize);
@@ -1739,7 +1741,7 @@ zio_write_compress(zio_t *zio)
 		 * to a hole.
 		 */
 		psize = zio_compress_data(ZIO_COMPRESS_EMPTY,
-		    zio->io_abd, NULL, lsize);
+		    zio->io_abd, NULL, lsize, 0);
 		if (psize == 0)
 			compress = ZIO_COMPRESS_OFF;
 	} else {

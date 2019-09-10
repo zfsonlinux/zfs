@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2020 by George Melikov. All rights reserved.
  */
 
 #ifndef _SYS_ZIO_COMPRESS_H
@@ -110,7 +111,7 @@ extern int lz4_decompress_zfs(void *src, void *dst, size_t s_len, size_t d_len,
  * Compress and decompress data if necessary.
  */
 extern size_t zio_compress_data(enum zio_compress c, abd_t *src, void *dst,
-    size_t s_len);
+    size_t s_len, int compress_threshold);
 extern int zio_decompress_data(enum zio_compress c, abd_t *src, void *dst,
     size_t s_len, size_t d_len);
 extern int zio_decompress_data_buf(enum zio_compress c, void *src, void *dst,
