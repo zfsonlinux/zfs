@@ -2,6 +2,7 @@
 Description=ZFS volumes are ready
 After=zfs-volume-wait.service
 Requires=zfs-volume-wait.service
+JobTimeoutSec=30
 
 [Install]
 WantedBy=zfs.target

@@ -47,6 +47,8 @@ fi
 # "requires". **THIS MAY CHANGE**
 req_dir="${dest_norm}/local-fs.target.wants/"
 mkdir -p "${req_dir}"
+zvol_reqdir="${dest_norm}/zfs-volumes.target.d"
+mkdir -p "${zvol_reqdir}"
 
 # All needed information about each ZFS is available from
 # zfs list -H -t filesystem -o <properties>
@@ -73,6 +75,13 @@ process_line() {
   p_nbmand="${10}"
   p_encroot="${11}"
   p_keyloc="${12}"
+
+  if [ "${p_mountpoint}" = "zvol" ] ; then
+    # special case of zvol
+    [ -e "${zvol_reqdir}/vols.conf" ] || echo '[Unit]' > "${zvol_reqdir}/vols.conf"
+    echo "Requires=dev-zvol-$(systemd-escape "${dataset}").device"  >> "${zvol_reqdir}/vols.conf"
+    return
+  fi
 
   # Check for canmount=off .
   if [ "${p_canmount}" = "off" ] ; then
