@@ -3659,8 +3659,7 @@ int
 zfs_rename(struct inode *sdip, char *snm, struct inode *tdip, char *tnm,
     cred_t *cr, int flags)
 {
-	znode_t		*tdzp, *szp, *tzp;
-	znode_t		*sdzp = ITOZ(sdip);
+	znode_t		*sdzp, *tdzp, *szp, *tzp;
 	zfsvfs_t	*zfsvfs = ITOZSB(sdip);
 	zilog_t		*zilog;
 	zfs_dirlock_t	*sdl, *tdl;
@@ -3670,14 +3669,23 @@ zfs_rename(struct inode *sdip, char *snm, struct inode *tdip, char *tnm,
 	int		error = 0;
 	int		zflg = 0;
 	boolean_t	waited = B_FALSE;
+	/* Needed for whiteout inode creation. */
+	vattr_t		wo_vap;
+	uint64_t	wo_projid;
+	boolean_t	fuid_dirtied;
+	zfs_acl_ids_t	acl_ids;
+	boolean_t	have_acl = B_FALSE;
+	znode_t		*wzp = NULL;
+
 
 	if (snm == NULL || tnm == NULL)
 		return (SET_ERROR(EINVAL));
 
 	ZFS_ENTER(zfsvfs);
-	ZFS_VERIFY_ZP(sdzp);
 	zilog = zfsvfs->z_log;
 
+	sdzp = ITOZ(sdip);
+	ZFS_VERIFY_ZP(sdzp);
 	tdzp = ITOZ(tdip);
 	ZFS_VERIFY_ZP(tdzp);
 
@@ -3840,6 +3848,7 @@ top:
 		error = SET_ERROR(EXDEV);
 		goto out;
 	}
+	wo_projid = szp->z_projid;
 
 	/*
 	 * Must have write access at the source to remove the old entry
@@ -3847,7 +3856,6 @@ top:
 	 * Note that if target and source are the same, this can be
 	 * done in a single check.
 	 */
-
 	if ((error = zfs_zaccess_rename(sdzp, szp, tdzp, tzp, cr)))
 		goto out;
 
@@ -3864,17 +3872,19 @@ top:
 	 * Does target exist?
 	 */
 	if (tzp) {
+		if (flags & RENAME_NOREPLACE) {
+			error = SET_ERROR(EEXIST);
+			goto out;
+		}
 		/*
-		 * Source and target must be the same type.
+		 * Source and target must be the same type (unless exchanging).
 		 */
-		if (S_ISDIR(ZTOI(szp)->i_mode)) {
-			if (!S_ISDIR(ZTOI(tzp)->i_mode)) {
-				error = SET_ERROR(ENOTDIR);
-				goto out;
-			}
-		} else {
-			if (S_ISDIR(ZTOI(tzp)->i_mode)) {
-				error = SET_ERROR(EISDIR);
+		if (!(flags & RENAME_EXCHANGE)) {
+			boolean_t s_is_dir = S_ISDIR(ZTOI(szp)->i_mode) != 0;
+			boolean_t t_is_dir = S_ISDIR(ZTOI(tzp)->i_mode) != 0;
+
+			if (s_is_dir != t_is_dir) {
+				error = SET_ERROR(s_is_dir ? ENOTDIR : EISDIR);
 				goto out;
 			}
 		}
@@ -3887,12 +3897,38 @@ top:
 			error = 0;
 			goto out;
 		}
+	} else if (flags & RENAME_EXCHANGE) {
+		/* Target must exist for RENAME_EXCHANGE. */
+		error = SET_ERROR(ENOENT);
+		goto out;
+	}
+
+	/* Set up inode creation for RENAME_WHITEOUT. */
+	if (flags & RENAME_WHITEOUT) {
+		error = zfs_zaccess(sdzp, ACE_ADD_FILE, 0, B_FALSE, cr);
+		if (error)
+			goto out;
+
+		zpl_vap_init(&wo_vap, ZTOI(sdzp), S_IFCHR, cr);
+		/* Can't use of makedevice() here, so hard-code it. */
+		wo_vap.va_rdev = 0;
+
+		error = zfs_acl_ids_create(sdzp, 0, &wo_vap, cr, NULL,
+		    &acl_ids);
+		if (error)
+			goto out;
+		have_acl = B_TRUE;
+
+		if (zfs_acl_ids_overquota(zfsvfs, &acl_ids, wo_projid)) {
+			error = SET_ERROR(EDQUOT);
+			goto out;
+		}
 	}
 
 	tx = dmu_tx_create(zfsvfs->z_os);
 	dmu_tx_hold_sa(tx, szp->z_sa_hdl, B_FALSE);
 	dmu_tx_hold_sa(tx, sdzp->z_sa_hdl, B_FALSE);
-	dmu_tx_hold_zap(tx, sdzp->z_id, FALSE, snm);
+	dmu_tx_hold_zap(tx, sdzp->z_id, !!(flags & RENAME_EXCHANGE), snm);
 	dmu_tx_hold_zap(tx, tdzp->z_id, TRUE, tnm);
 	if (sdzp != tdzp) {
 		dmu_tx_hold_sa(tx, tdzp->z_sa_hdl, B_FALSE);
@@ -3902,7 +3938,21 @@ top:
 		dmu_tx_hold_sa(tx, tzp->z_sa_hdl, B_FALSE);
 		zfs_sa_upgrade_txholds(tx, tzp);
 	}
+	if (flags & RENAME_WHITEOUT) {
+		dmu_tx_hold_sa_create(tx, acl_ids.z_aclp->z_acl_bytes +
+		    ZFS_SA_BASE_ATTR_SIZE);
 
+		dmu_tx_hold_zap(tx, sdzp->z_id, TRUE, snm);
+		dmu_tx_hold_sa(tx, sdzp->z_sa_hdl, B_FALSE);
+		if (!zfsvfs->z_use_sa &&
+		    acl_ids.z_aclp->z_acl_bytes > ZFS_ACE_SPACE) {
+			dmu_tx_hold_write(tx, DMU_NEW_OBJECT,
+			    0, acl_ids.z_aclp->z_acl_bytes);
+		}
+	}
+	fuid_dirtied = zfsvfs->z_fuid_dirty;
+	if (fuid_dirtied)
+		zfs_fuid_txhold(zfsvfs, tx);
 	zfs_sa_upgrade_txholds(tx, szp);
 	dmu_tx_hold_zap(tx, zfsvfs->z_unlinkedobj, FALSE, NULL);
 	error = dmu_tx_assign(tx, (waited ? TXG_NOTHROTTLE : 0) | TXG_NOWAIT);
@@ -3932,58 +3982,111 @@ top:
 		return (error);
 	}
 
-	if (tzp)	/* Attempt to remove the existing target */
-		error = zfs_link_destroy(tdl, tzp, tx, zflg, NULL);
+	/*
+	 * Unlink the source.
+	 */
+	szp->z_pflags |= ZFS_AV_MODIFIED;
+	if (tdzp->z_pflags & ZFS_PROJINHERIT)
+		szp->z_pflags |= ZFS_PROJINHERIT;
 
-	if (error == 0) {
-		error = zfs_link_create(tdl, szp, tx, ZRENAMING);
-		if (error == 0) {
-			szp->z_pflags |= ZFS_AV_MODIFIED;
-			if (tdzp->z_pflags & ZFS_PROJINHERIT)
-				szp->z_pflags |= ZFS_PROJINHERIT;
+	error = sa_update(szp->z_sa_hdl, SA_ZPL_FLAGS(zfsvfs),
+	    (void *)&szp->z_pflags, sizeof (uint64_t), tx);
+	VERIFY0(error);
 
-			error = sa_update(szp->z_sa_hdl, SA_ZPL_FLAGS(zfsvfs),
-			    (void *)&szp->z_pflags, sizeof (uint64_t), tx);
+	error = zfs_link_destroy(sdl, szp, tx, ZRENAMING, NULL);
+	if (error)
+		goto commit;
+
+	/*
+	 * Unlink the target.
+	 */
+	if (tzp) {
+		int tzflg = zflg;
+
+		if (flags & RENAME_EXCHANGE) {
+			/* This inode will be re-linked soon. */
+			tzflg |= ZRENAMING;
+
+			tzp->z_pflags |= ZFS_AV_MODIFIED;
+			if (sdzp->z_pflags & ZFS_PROJINHERIT)
+				tzp->z_pflags |= ZFS_PROJINHERIT;
+
+			error = sa_update(tzp->z_sa_hdl, SA_ZPL_FLAGS(zfsvfs),
+			    (void *)&tzp->z_pflags, sizeof (uint64_t), tx);
 			ASSERT0(error);
-
-			error = zfs_link_destroy(sdl, szp, tx, ZRENAMING, NULL);
-			if (error == 0) {
-				zfs_log_rename(zilog, tx, TX_RENAME |
-				    (flags & FIGNORECASE ? TX_CI : 0), sdzp,
-				    sdl->dl_name, tdzp, tdl->dl_name, szp);
-			} else {
-				/*
-				 * At this point, we have successfully created
-				 * the target name, but have failed to remove
-				 * the source name.  Since the create was done
-				 * with the ZRENAMING flag, there are
-				 * complications; for one, the link count is
-				 * wrong.  The easiest way to deal with this
-				 * is to remove the newly created target, and
-				 * return the original error.  This must
-				 * succeed; fortunately, it is very unlikely to
-				 * fail, since we just created it.
-				 */
-				VERIFY3U(zfs_link_destroy(tdl, szp, tx,
-				    ZRENAMING, NULL), ==, 0);
-			}
-		} else {
-			/*
-			 * If we had removed the existing target, subsequent
-			 * call to zfs_link_create() to add back the same entry
-			 * but, the new dnode (szp) should not fail.
-			 */
-			ASSERT(tzp == NULL);
 		}
+		error = zfs_link_destroy(tdl, tzp, tx, tzflg, NULL);
+		if (error)
+			goto commit_link_szp;
 	}
 
+	/*
+	 * Create the new target links:
+	 *   * We always link the target.
+	 *   * RENAME_WHITEOUT: Create a whiteout inode in-place of the source.
+	 *   * RENAME_EXCHANGE: Link the old target to the source.
+	 */
+	error = zfs_link_create(tdl, szp, tx, ZRENAMING);
+	if (error) {
+		/*
+		 * If we have removed the existing target, a subsequent call to
+		 * zfs_link_create() to add back the same entry, but with a new
+		 * dnode (szp), should not fail.
+		 */
+		ASSERT3P(tzp, ==, NULL);
+		goto commit_link_tzp;
+	}
+
+	if (flags & RENAME_EXCHANGE) {
+		error = zfs_link_create(sdl, tzp, tx, ZRENAMING);
+		/*
+		 * The same argument as zfs_link_create() failing for
+		 * szp applies here, since the source directory must
+		 * have had an entry we are replacing.
+		 */
+		ASSERT3U(error, ==, 0);
+		if (error)
+			goto commit_unlink_td_szp;
+	} else if (flags & RENAME_WHITEOUT) {
+		zfs_mknode(sdzp, &wo_vap, tx, cr, 0, &wzp, &acl_ids);
+		error = zfs_link_create(sdl, wzp, tx, ZNEW);
+		if (error) {
+			zfs_znode_delete(wzp, tx);
+			remove_inode_hash(ZTOI(wzp));
+			goto commit_unlink_td_szp;
+		}
+		/* No need to zfs_log_create_txtype here. */
+	}
+
+	if (fuid_dirtied)
+		zfs_fuid_sync(zfsvfs, tx);
+
+	if (flags & RENAME_EXCHANGE) {
+		zfs_log_rename_exchange(zilog, tx,
+		    (flags & FIGNORECASE ? TX_CI : 0), sdzp,
+		    sdl->dl_name, tdzp, tdl->dl_name, szp);
+	} else if (flags & RENAME_WHITEOUT) {
+		vsecattr_t vsecp;
+
+		vsecp.vsa_mask |= VSA_ACE_ALLTYPES;
+		error = zfs_getacl(szp, &vsecp, B_TRUE, cr);
+		VERIFY0(error);
+
+		zfs_log_rename_whiteout(zilog, tx,
+		    (flags & FIGNORECASE ? TX_CI : 0), sdzp,
+		    sdl->dl_name, tdzp, tdl->dl_name, szp, wzp,
+		    &vsecp, acl_ids.z_fuidp, &wo_vap);
+	} else {
+		zfs_log_rename(zilog, tx,
+		    (flags & FIGNORECASE ? TX_CI : 0), sdzp,
+		    sdl->dl_name, tdzp, tdl->dl_name, szp);
+	}
+
+commit:
 	dmu_tx_commit(tx);
 out:
-	if (zl != NULL)
-		zfs_rename_unlock(&zl);
-
-	zfs_dirent_unlock(sdl);
-	zfs_dirent_unlock(tdl);
+	if (have_acl)
+		zfs_acl_ids_free(&acl_ids);
 
 	zfs_inode_update(sdzp);
 	if (sdzp == tdzp)
@@ -3994,16 +4097,57 @@ out:
 
 	zfs_inode_update(szp);
 	iput(ZTOI(szp));
+	if (wzp) {
+		zfs_inode_update(wzp);
+		iput(ZTOI(wzp));
+	}
 	if (tzp) {
 		zfs_inode_update(tzp);
 		iput(ZTOI(tzp));
 	}
+
+	if (zl != NULL)
+		zfs_rename_unlock(&zl);
+
+	zfs_dirent_unlock(sdl);
+	zfs_dirent_unlock(tdl);
 
 	if (zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
 		zil_commit(zilog, 0);
 
 	ZFS_EXIT(zfsvfs);
 	return (error);
+
+	/*
+	 * Clean-up path for broken link state.
+	 *
+	 * At this point we are in a (very) bad state, so we need to do our
+	 * best to correct the state. In particular, all of the nlinks are
+	 * wrong because we were destroying and creating links with ZRENAMING.
+	 *
+	 * In some form, all of thee operations have to resolve the state:
+	 *
+	 *  * link_destroy() *must* succeed. Fortunately, this is very likely
+	 *    since we only just created it.
+	 *
+	 *  * link_create()s are allowed to fail (though they shouldn't because
+	 *    we only just unlinked them and are putting the entries back
+	 *    during clean-up). But if they fail, we can just forcefully drop
+	 *    the nlink value to (at the very least) avoid broken nlink values
+	 *    -- though in the case of non-empty directories we will have to
+	 *    panic (otherwise we'd have a leaked directory with a broken ..).
+	 */
+commit_unlink_td_szp:
+	VERIFY3U(zfs_link_destroy(tdl, szp, tx, ZRENAMING, NULL), ==, 0);
+commit_link_tzp:
+	if (tzp) {
+		if (zfs_link_create(tdl, tzp, tx, ZRENAMING))
+			VERIFY3U(zfs_drop_nlink(tzp, tx, NULL), ==, 0);
+	}
+commit_link_szp:
+	if (zfs_link_create(sdl, szp, tx, ZRENAMING))
+		VERIFY3U(zfs_drop_nlink(szp, tx, NULL), ==, 0);
+	goto commit;
 }
 
 /*
