@@ -28,6 +28,13 @@
 
 #define	F_FREESP 11
 
+#define	POSIX_FADV_NORMAL 0
+#define	POSIX_FADV_RANDOM  1
+#define	POSIX_FADV_SEQUENTIAL 2
+#define	POSIX_FADV_WILLNEED 3
+#define	POSIX_FADV_DONTNEED 4
+#define	POSIX_FADV_NOREUSE 5
+
 #ifdef CONFIG_64BIT
 typedef struct flock flock64_t;
 #else

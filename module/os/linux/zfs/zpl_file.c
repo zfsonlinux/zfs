@@ -27,6 +27,7 @@
 #ifdef CONFIG_COMPAT
 #include <linux/compat.h>
 #endif
+#include <sys/fcntl.h>
 #include <sys/file.h>
 #include <sys/dmu_objset.h>
 #include <sys/zfs_znode.h>
@@ -773,6 +774,60 @@ zpl_fallocate(struct file *filp, int mode, loff_t offset, loff_t len)
 	    mode, offset, len);
 }
 
+#ifdef HAVE_FADVISE
+static int
+zpl_fadvise(struct file *filp, loff_t offset, loff_t len, int advice)
+{
+	struct inode *ip = file_inode(filp);
+	znode_t *zp = ITOZ(ip);
+	zfsvfs_t *zfsvfs = ITOZSB(ip);
+	objset_t *os = zfsvfs->z_os;
+	int error = 0;
+
+	if (offset < 0 || len < 0) {
+		error = -EINVAL;
+		goto out;
+	}
+
+	if (len == 0) {
+		spl_inode_lock(ip);
+		len = i_size_read(ip) - offset;
+		spl_inode_unlock(ip);
+	}
+
+	ZFS_ENTER(zfsvfs);
+	ZFS_VERIFY_ZP(zp);
+
+	switch (advice) {
+	case POSIX_FADV_WILLNEED:
+		/*
+		 * Pass on the caller's size directly, but note that
+		 * dmu_prefetch_max will effectively cap it.  If there
+		 * really is a larger sequential access pattern, perhaps
+		 * dmu_zfetch will detect it.
+		 */
+		dmu_prefetch(os, zp->z_id, 0, offset, len,
+		    ZIO_PRIORITY_ASYNC_READ);
+		break;
+	case POSIX_FADV_NORMAL:
+	case POSIX_FADV_RANDOM:
+	case POSIX_FADV_SEQUENTIAL:
+	case POSIX_FADV_DONTNEED:
+	case POSIX_FADV_NOREUSE:
+		/* ignored for now */
+		break;
+	default:
+		error = -EINVAL;
+		break;
+	}
+
+	ZFS_EXIT(zfsvfs);
+
+out:
+	return (error);
+}
+#endif /* HAVE_FADVISE */
+
 #define	ZFS_FL_USER_VISIBLE	(FS_FL_USER_VISIBLE | ZFS_PROJINHERIT_FL)
 #define	ZFS_FL_USER_MODIFIABLE	(FS_FL_USER_MODIFIABLE | ZFS_PROJINHERIT_FL)
 
@@ -1008,6 +1063,9 @@ const struct file_operations zpl_file_operations = {
 	.aio_fsync	= zpl_aio_fsync,
 #endif
 	.fallocate	= zpl_fallocate,
+#ifdef HAVE_FADVISE
+	.fadvise	= zpl_fadvise,
+#endif
 	.unlocked_ioctl	= zpl_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl	= zpl_compat_ioctl,
