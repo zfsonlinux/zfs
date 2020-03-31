@@ -170,6 +170,15 @@ ddt_object_sync(ddt_t *ddt, enum ddt_type type, enum ddt_class class,
 	ddo->ddo_mspace = doi.doi_fill_count * doi.doi_data_block_size;
 }
 
+static void
+ddt_object_loadall(ddt_t *ddt, enum ddt_type type, enum ddt_class class)
+{
+	if (ddt_object_exists(ddt, type, class)) {
+		ddt_ops[type]->ddt_op_loadall(ddt->ddt_os,
+		    ddt->ddt_object[type][class]);
+	}
+}
+
 static int
 ddt_object_lookup(ddt_t *ddt, enum ddt_type type, enum ddt_class class,
     ddt_entry_t *dde)
@@ -490,12 +499,6 @@ ddt_get_dedup_object_stats(spa_t *spa, ddt_object_t *ddo_total)
 			}
 		}
 	}
-
-	/* ... and compute the averages. */
-	if (ddo_total->ddo_count != 0) {
-		ddo_total->ddo_dspace /= ddo_total->ddo_count;
-		ddo_total->ddo_mspace /= ddo_total->ddo_count;
-	}
 }
 
 void
@@ -550,6 +553,27 @@ ddt_get_pool_dedup_ratio(spa_t *spa)
 		return (100);
 
 	return (dds_total.dds_ref_dsize * 100 / dds_total.dds_dsize);
+}
+
+uint64_t
+ddt_get_pool_dedup_cached(spa_t *spa)
+{
+	uint64_t l1sz, l1tot, l2sz, l2tot;
+
+	l1tot = l2tot = 0;
+	for (enum zio_checksum ck = 0; ck < ZIO_CHECKSUM_FUNCTIONS; ck++) {
+		ddt_t *ddt = spa->spa_ddt[ck];
+		for (enum ddt_type ddtt = 0; ddtt < DDT_TYPES; ddtt++) {
+			for (enum ddt_class cl = 0; cl < DDT_CLASSES; cl++) {
+				dmu_object_cached_size(ddt->ddt_os,
+				    ddt->ddt_object[ddtt][cl], &l1sz, &l2sz);
+				l1tot += l1sz;
+				l2tot += l2sz;
+			}
+		}
+	}
+
+	return (l1tot + l2tot);
 }
 
 size_t
@@ -670,6 +694,24 @@ ddt_remove(ddt_t *ddt, ddt_entry_t *dde)
 
 	avl_remove(&ddt->ddt_tree, dde);
 	ddt_free(dde);
+}
+
+void
+ddt_loadall(ddt_t *ddt)
+{
+	enum ddt_type type;
+	enum ddt_class class;
+
+	/*
+	 * Load all DDT entries for each type/class combination.  This is
+	 * intended to perform a prefetch on all such blocks.  For the same
+	 * reason that ddt_prefetch isn't locked, this is also not locked.
+	 */
+	for (type  = 0; type < DDT_TYPES; type++) {
+		for (class = 0; class < DDT_CLASSES; class++) {
+			ddt_object_loadall(ddt, type, class);
+		}
+	}
 }
 
 ddt_entry_t *

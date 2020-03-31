@@ -86,6 +86,7 @@ static int zpool_do_remove(int, char **);
 static int zpool_do_labelclear(int, char **);
 
 static int zpool_do_checkpoint(int, char **);
+static int zpool_do_prefetch(int, char **);
 
 static int zpool_do_list(int, char **);
 static int zpool_do_iostat(int, char **);
@@ -160,6 +161,7 @@ typedef enum {
 	HELP_LIST,
 	HELP_OFFLINE,
 	HELP_ONLINE,
+	HELP_PREFETCH,
 	HELP_REPLACE,
 	HELP_REMOVE,
 	HELP_INITIALIZE,
@@ -286,6 +288,7 @@ static zpool_command_t command_table[] = {
 	{ "labelclear",	zpool_do_labelclear,	HELP_LABELCLEAR		},
 	{ NULL },
 	{ "checkpoint",	zpool_do_checkpoint,	HELP_CHECKPOINT		},
+	{ "prefetch",	zpool_do_prefetch,	HELP_PREFETCH		},
 	{ NULL },
 	{ "list",	zpool_do_list,		HELP_LIST		},
 	{ "iostat",	zpool_do_iostat,	HELP_IOSTAT		},
@@ -376,6 +379,9 @@ get_usage(zpool_help_t idx)
 		return (gettext("\tlist [-gHLpPv] [-o property[,...]] "
 		    "[-T d|u] [pool] ... \n"
 		    "\t    [interval [count]]\n"));
+	case HELP_PREFETCH:
+		return (gettext("\tprefetch <type> [<type opts>] <pool>\n"
+		    "\tprefetch ddt <pool>\n"));
 	case HELP_OFFLINE:
 		return (gettext("\toffline [-f] [-t] <pool> <device> ...\n"));
 	case HELP_ONLINE:
@@ -1874,7 +1880,7 @@ typedef struct status_cbdata {
 	boolean_t	cb_literal;
 	boolean_t	cb_explain;
 	boolean_t	cb_first;
-	boolean_t	cb_dedup_stats;
+	int		cb_dedup_stats;
 	boolean_t	cb_print_status;
 	boolean_t	cb_print_slow_ios;
 	boolean_t	cb_print_vdev_init;
@@ -3077,6 +3083,77 @@ zpool_do_checkpoint(int argc, char **argv)
 }
 
 #define	CHECKPOINT_OPT	1024
+
+enum zpool_prefetch_type {
+	ZPOOL_PREFETCH_TYPE_DDT,
+};
+
+/*
+ * zpool prefetch <type> [<type opts> ...] <pool>
+ *
+ * Prefetches a particular type of data in the specified pool.
+ */
+int
+zpool_do_prefetch(int argc, char **argv)
+{
+	char *pool;
+	char *typestr;
+	enum zpool_prefetch_type type;
+	zpool_handle_t *zhp;
+	int err = 0;
+
+	argc--;
+	argv++;
+	if (argc < 1) {
+		(void) fprintf(stderr, gettext("missing type argument\n"));
+		usage(B_FALSE);
+	}
+	if (argc < 2) {
+		(void) fprintf(stderr, gettext("missing pool argument\n"));
+		usage(B_FALSE);
+	}
+	if (argc > 2) {
+		(void) fprintf(stderr, gettext("too many arguments\n"));
+		usage(B_FALSE);
+	}
+
+	typestr = argv[0];
+	pool = argv[1];
+
+	if (strcmp(typestr, "ddt") == 0) {
+		type = ZPOOL_PREFETCH_TYPE_DDT;
+	} else {
+		(void) fprintf(stderr, gettext("unsupported prefetch type\n"));
+		usage(B_FALSE);
+	}
+
+	if ((zhp = zpool_open(g_zfs, pool)) == NULL) {
+		/* As a special case, check for use of '/' in the name */
+		switch (type) {
+		case ZPOOL_PREFETCH_TYPE_DDT:
+			if (strchr(pool, '/') != NULL) {
+				(void) fprintf(stderr, gettext("This prefetch "
+				    "type doesn't work on datasets.\n"));
+			}
+			break;
+		default:
+			break;
+		}
+		return (1);
+	}
+
+	switch (type) {
+	case ZPOOL_PREFETCH_TYPE_DDT:
+		err = zpool_ddtload(zhp);
+		break;
+	default:
+		break;
+	}
+
+	zpool_close(zhp);
+
+	return (err);
+}
 
 /*
  * zpool import [-d dir] [-D]
@@ -5713,6 +5790,7 @@ print_one_column(zpool_prop_t prop, uint64_t value, const char *str,
 	case ZPOOL_PROP_EXPANDSZ:
 	case ZPOOL_PROP_CHECKPOINT:
 	case ZPOOL_PROP_DEDUPRATIO:
+	case ZPOOL_PROP_DEDUPCACHED:
 		if (value == 0)
 			(void) strlcpy(propval, "-", sizeof (propval));
 		else
@@ -7503,13 +7581,17 @@ print_l2cache(zpool_handle_t *zhp, status_cbdata_t *cb, nvlist_t **l2cache,
 }
 
 static void
-print_dedup_stats(nvlist_t *config)
+print_dedup_stats(zpool_handle_t *zhp, nvlist_t *config, boolean_t literal)
 {
 	ddt_histogram_t *ddh;
 	ddt_stat_t *dds;
 	ddt_object_t *ddo;
 	uint_t c;
-	char dspace[6], mspace[6];
+	/* Extra space provided for literal display */
+	char dspace[32], mspace[32], cspace[32];
+	uint64_t cspace_prop;
+	enum zfs_nicenum_format format;
+	zprop_source_t src;
 
 	/*
 	 * If the pool was faulted then we may not have been able to
@@ -7527,12 +7609,26 @@ print_dedup_stats(nvlist_t *config)
 		return;
 	}
 
-	zfs_nicebytes(ddo->ddo_dspace, dspace, sizeof (dspace));
-	zfs_nicebytes(ddo->ddo_mspace, mspace, sizeof (mspace));
-	(void) printf("DDT entries %llu, size %s on disk, %s in core\n",
+	/*
+	 * Squash cached size into in-core size to handle race.
+	 * Only include cached size if it is available.
+	 */
+	cspace_prop = MIN(zpool_get_prop_int(zhp, ZPOOL_PROP_DEDUPCACHED, &src),
+	    ddo->ddo_mspace);
+	format = literal ? ZFS_NICENUM_RAW : ZFS_NICENUM_1024;
+	zfs_nicenum_format(cspace_prop, cspace, sizeof (cspace), format);
+	zfs_nicenum_format(ddo->ddo_dspace, dspace, sizeof (dspace), format);
+	zfs_nicenum_format(ddo->ddo_mspace, mspace, sizeof (mspace), format);
+	(void) printf("DDT entries %llu, size %s on disk, %s in core",
 	    (u_longlong_t)ddo->ddo_count,
 	    dspace,
 	    mspace);
+	if (src != ZPROP_SRC_DEFAULT) {
+		(void) printf(", %s cached (%.02f%%)",
+		    cspace,
+		    (double)cspace_prop / (double)ddo->ddo_mspace * 100.0);
+	}
+	(void) printf("\n");
 
 	verify(nvlist_lookup_uint64_array(config, ZPOOL_CONFIG_DDT_STATS,
 	    (uint64_t **)&dds, &c) == 0);
@@ -7567,6 +7663,10 @@ status_callback(zpool_handle_t *zhp, void *data)
 	const char *health;
 	uint_t c;
 	vdev_stat_t *vs;
+
+	/* If dedup stats were requested, also fetch dedupcached. */
+	if (cbp->cb_dedup_stats > 1)
+		zpool_add_propname(zhp, "dedupcached");
 
 	config = zpool_get_config(zhp, NULL);
 	reason = zpool_get_status(zhp, &msgid, &errata);
@@ -8010,7 +8110,7 @@ status_callback(zpool_handle_t *zhp, void *data)
 		}
 
 		if (cbp->cb_dedup_stats)
-			print_dedup_stats(config);
+			print_dedup_stats(zhp, config, cbp->cb_literal);
 	} else {
 		(void) printf(gettext("config: The configuration cannot be "
 		    "determined.\n"));
@@ -8100,7 +8200,7 @@ zpool_do_status(int argc, char **argv)
 			cb.cb_explain = B_TRUE;
 			break;
 		case 'D':
-			cb.cb_dedup_stats = B_TRUE;
+			cb.cb_dedup_stats++;
 			break;
 		case 't':
 			cb.cb_print_vdev_trim = B_TRUE;

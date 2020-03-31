@@ -2919,34 +2919,59 @@ zfs_ioc_pool_set_props(zfs_cmd_t *zc)
 	return (error);
 }
 
-static int
-zfs_ioc_pool_get_props(zfs_cmd_t *zc)
-{
-	spa_t *spa;
-	int error;
-	nvlist_t *nvp = NULL;
+/*
+ * innvl: {
+ *	"get_props_names": [ "prop1", "prop2", ..., "propN" ]
+ *	"get_props_inclusive": true | false
+ * }
+ */
+static const zfs_ioc_key_t zfs_keys_get_props[] = {
+	{ ZPOOL_GET_PROPS_NAMES,	DATA_TYPE_STRING_ARRAY,	ZK_OPTIONAL },
+	{ ZPOOL_GET_PROPS_EXCLUSIVE,	DATA_TYPE_BOOLEAN,	ZK_OPTIONAL },
+};
 
-	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0) {
+static int
+zfs_ioc_pool_get_props(const char *pool, nvlist_t *innvl, nvlist_t *outnvl)
+{
+	nvlist_t *nvp = outnvl;
+	spa_t *spa = NULL;
+	int error = 0;
+	boolean_t exclusive = B_FALSE;
+	boolean_t opened = B_FALSE;
+	char **props = NULL;
+	unsigned int n_props = 0;
+
+	if (nvlist_lookup_string_array(innvl, ZPOOL_GET_PROPS_NAMES,
+	    &props, &n_props) != 0)
+		props = NULL;
+	exclusive = nvlist_lookup_boolean(innvl, ZPOOL_GET_PROPS_EXCLUSIVE) == 0;
+
+	error = spa_open(pool, &spa, FTAG);
+	opened = error == 0;
+	if (!opened) {
 		/*
 		 * If the pool is faulted, there may be properties we can still
 		 * get (such as altroot and cachefile), so attempt to get them
 		 * anyway.
 		 */
 		mutex_enter(&spa_namespace_lock);
-		if ((spa = spa_lookup(zc->zc_name)) != NULL)
-			error = spa_prop_get(spa, &nvp);
-		mutex_exit(&spa_namespace_lock);
-	} else {
-		error = spa_prop_get(spa, &nvp);
-		spa_close(spa, FTAG);
+		spa = spa_lookup(pool);
 	}
 
-	if (error == 0 && zc->zc_nvlist_dst != 0)
-		error = put_nvlist(zc, nvp);
-	else
-		error = SET_ERROR(EFAULT);
+	if (spa != NULL) {
+		if (!exclusive)
+			error = spa_prop_get(spa, &nvp);
 
-	nvlist_free(nvp);
+		if (error == 0 && props != NULL)
+			error = spa_prop_get_nvlist(spa, props, n_props, &nvp);
+
+		if (opened)
+			spa_close(spa, FTAG);
+	}
+
+	if (!opened)
+		mutex_exit(&spa_namespace_lock);
+
 	return (error);
 }
 
@@ -3801,6 +3826,34 @@ zfs_ioc_pool_discard_checkpoint(const char *poolname, nvlist_t *innvl,
     nvlist_t *outnvl)
 {
 	return (spa_checkpoint_discard(poolname));
+}
+
+/*
+ * innvl: unused
+ * outnvl: empty
+ */
+static const zfs_ioc_key_t zfs_keys_pool_ddtload[] = {
+	/* no nvl keys */
+};
+
+/* ARGSUSED */
+static int
+zfs_ioc_pool_ddtload(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl)
+{
+	int error;
+	spa_t *spa;
+
+	error = spa_open(poolname, &spa, FTAG);
+	if (error != 0)
+		return (error);
+
+	for (enum zio_checksum c = 0; c < ZIO_CHECKSUM_FUNCTIONS; c++) {
+		ddt_loadall(spa->spa_ddt[c]);
+	}
+
+	spa_close(spa, FTAG);
+
+	return (error);
 }
 
 /*
@@ -6900,6 +6953,12 @@ zfs_ioctl_init(void)
 	    zfs_keys_pool_discard_checkpoint,
 	    ARRAY_SIZE(zfs_keys_pool_discard_checkpoint));
 
+	zfs_ioctl_register("zpool_ddtload",
+	    ZFS_IOC_POOL_DDTLOAD, zfs_ioc_pool_ddtload,
+	    zfs_secpolicy_config, POOL_NAME,
+	    POOL_CHECK_SUSPENDED, B_TRUE, B_TRUE,
+	    zfs_keys_pool_ddtload, ARRAY_SIZE(zfs_keys_pool_ddtload));
+
 	zfs_ioctl_register("initialize", ZFS_IOC_POOL_INITIALIZE,
 	    zfs_ioc_pool_initialize, zfs_secpolicy_config, POOL_NAME,
 	    POOL_CHECK_SUSPENDED | POOL_CHECK_READONLY, B_TRUE, B_TRUE,
@@ -6970,8 +7029,11 @@ zfs_ioctl_init(void)
 
 	zfs_ioctl_register_pool(ZFS_IOC_POOL_STATS, zfs_ioc_pool_stats,
 	    zfs_secpolicy_read, B_FALSE, POOL_CHECK_NONE);
-	zfs_ioctl_register_pool(ZFS_IOC_POOL_GET_PROPS, zfs_ioc_pool_get_props,
-	    zfs_secpolicy_read, B_FALSE, POOL_CHECK_NONE);
+	zfs_ioctl_register("get_props", ZFS_IOC_POOL_GET_PROPS,
+	    zfs_ioc_pool_get_props, zfs_secpolicy_read, POOL_NAME,
+	    POOL_CHECK_NONE, B_FALSE, B_TRUE,
+	    zfs_keys_get_props, ARRAY_SIZE(zfs_keys_get_props));
+
 
 	zfs_ioctl_register_pool(ZFS_IOC_ERROR_LOG, zfs_ioc_error_log,
 	    zfs_secpolicy_inject, B_FALSE, POOL_CHECK_SUSPENDED);

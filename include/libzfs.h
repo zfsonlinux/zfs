@@ -406,6 +406,7 @@ extern nvlist_t *zpool_get_config(zpool_handle_t *, nvlist_t **);
 extern nvlist_t *zpool_get_features(zpool_handle_t *);
 extern int zpool_refresh_stats(zpool_handle_t *, boolean_t *);
 extern int zpool_get_errlog(zpool_handle_t *, nvlist_t **);
+extern void zpool_add_propname(zpool_handle_t *, char *);
 
 /*
  * Import and export functions
@@ -449,6 +450,7 @@ extern void zpool_explain_recover(libzfs_handle_t *, const char *, int,
     nvlist_t *);
 extern int zpool_checkpoint(zpool_handle_t *);
 extern int zpool_discard_checkpoint(zpool_handle_t *);
+extern int zpool_ddtload(zpool_handle_t *);
 
 /*
  * Basic handle manipulations.  These functions do not create or destroy the

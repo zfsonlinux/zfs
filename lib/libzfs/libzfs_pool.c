@@ -73,6 +73,14 @@ zpool_get_all_props(zpool_handle_t *zhp)
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 
+	if (zhp->zpool_n_propnames > 0) {
+		nvlist_t *innvl = fnvlist_alloc();
+		fnvlist_add_string_array(innvl, ZPOOL_GET_PROPS_NAMES,
+		    zhp->zpool_propnames, zhp->zpool_n_propnames);
+		if (zcmd_write_src_nvlist(hdl, &zc, innvl) != 0)
+			return (-1);
+	}
+
 	if (zcmd_alloc_dst_nvlist(hdl, &zc, 0) != 0)
 		return (-1);
 
@@ -1450,6 +1458,27 @@ zpool_discard_checkpoint(zpool_handle_t *zhp)
 	if (error != 0) {
 		(void) snprintf(msg, sizeof (msg), dgettext(TEXT_DOMAIN,
 		    "cannot discard checkpoint in '%s'"), zhp->zpool_name);
+		(void) zpool_standard_error(hdl, error, msg);
+		return (-1);
+	}
+
+	return (0);
+}
+
+/*
+ * Load the DDT table for the given pool.
+ */
+int
+zpool_ddtload(zpool_handle_t *zhp)
+{
+	libzfs_handle_t *hdl = zhp->zpool_hdl;
+	char msg[1024];
+	int error;
+
+	error = lzc_pool_ddtload(zhp->zpool_name);
+	if (error != 0) {
+		(void) snprintf(msg, sizeof (msg), dgettext(TEXT_DOMAIN,
+		    "cannot load DDT in '%s'"), zhp->zpool_name);
 		(void) zpool_standard_error(hdl, error, msg);
 		return (-1);
 	}
@@ -3981,6 +4010,15 @@ static int
 zbookmark_mem_compare(const void *a, const void *b)
 {
 	return (memcmp(a, b, sizeof (zbookmark_phys_t)));
+}
+
+void
+zpool_add_propname(zpool_handle_t *zhp, char *propname)
+{
+
+	assert(zhp->zpool_n_propnames < ZHP_MAX_PROPNAMES);
+	zhp->zpool_propnames[zhp->zpool_n_propnames] = propname;
+	zhp->zpool_n_propnames++;
 }
 
 /*

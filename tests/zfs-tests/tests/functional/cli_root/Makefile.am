@@ -49,6 +49,7 @@ SUBDIRS = \
 	zpool_labelclear \
 	zpool_offline \
 	zpool_online \
+	zpool_prefetch \
 	zpool_remove \
 	zpool_reopen \
 	zpool_replace \
