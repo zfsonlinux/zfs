@@ -37,6 +37,13 @@ USER_C += \
 	os/freebsd/zone.c
 endif
 
+if BUILD_MACOS
+USER_C += \
+	os/macos/getexecname.c \
+	os/macos/gethostid.c \
+	os/macos/zone.c
+endif
+
 libspl_la_SOURCES = $(USER_C)
 
 libspl_la_LIBADD = \

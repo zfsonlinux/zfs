@@ -29,9 +29,9 @@
  *
  * CDDL HEADER END
  */
-
-AC_INIT(m4_esyscmd(grep ^Name: META | cut -d ':' -f 2 | tr -d ' \n'),
-	m4_esyscmd(grep ^Version: META | cut -d ':' -f 2 | tr -d ' \n'))
+m4_define([NAME], m4_esyscmd([awk '/^Name:/ {print $2}' META | tr -d '\n']))
+m4_define([VERS], m4_esyscmd([awk '/^Version:/ {print $2}' META | tr -d '\n']))
+AC_INIT(NAME, VERS)
 AC_LANG(C)
 ZFS_AC_META
 AC_CONFIG_AUX_DIR([config])
@@ -55,6 +55,11 @@ AM_PROG_CC_C_O
 AX_CODE_COVERAGE
 _AM_PROG_TAR(pax)
 
+dnl macOS additionals
+AC_PROG_CXX(clang++)
+AC_PROG_OBJC(clang)
+AC_PROG_OBJCXX(clang++)
+
 ZFS_AC_LICENSE
 ZFS_AC_CONFIG
 ZFS_AC_PACKAGE
@@ -64,6 +69,7 @@ ZFS_AC_DEBUG_KMEM
 ZFS_AC_DEBUG_KMEM_TRACKING
 ZFS_AC_DEBUG_INVARIANTS
 
+
 AC_CONFIG_FILES([
 	Makefile
 	cmd/Makefile
@@ -72,6 +78,14 @@ AC_CONFIG_FILES([
 	cmd/dbufstat/Makefile
 	cmd/fsck_zfs/Makefile
 	cmd/mount_zfs/Makefile
+	cmd/os/Makefile
+	cmd/os/macos/Makefile
+	cmd/os/macos/InvariantDisks/Makefile
+	cmd/os/macos/InvariantDisks/InvariantDisks/Makefile
+	cmd/os/macos/mount_zfs/Makefile
+	cmd/os/macos/zconfigd/Makefile
+	cmd/os/macos/zfs_util/Makefile
+	cmd/os/macos/zsysctl/Makefile
 	cmd/raidz_test/Makefile
 	cmd/vdev_id/Makefile
 	cmd/zdb/Makefile
@@ -107,7 +121,11 @@ AC_CONFIG_FILES([
 	etc/Makefile
 	etc/default/Makefile
 	etc/init.d/Makefile
+	etc/launchd/Makefile
+	etc/launchd/daemons/Makefile
+	etc/launchd/launchd.d/Makefile
 	etc/modules-load.d/Makefile
+	etc/paths.d/Makefile
 	etc/sudoers.d/Makefile
 	etc/systemd/Makefile
 	etc/systemd/system-generators/Makefile
@@ -131,6 +149,12 @@ AC_CONFIG_FILES([
 	include/os/linux/spl/sys/Makefile
 	include/os/linux/zfs/Makefile
 	include/os/linux/zfs/sys/Makefile
+	include/os/macos/Makefile
+	include/os/macos/spl/Makefile
+	include/os/macos/spl/rpc/Makefile
+	include/os/macos/spl/sys/Makefile
+	include/os/macos/zfs/Makefile
+	include/os/macos/zfs/sys/Makefile
 	include/sys/Makefile
 	include/sys/crypto/Makefile
 	include/sys/fm/Makefile
@@ -154,6 +178,10 @@ AC_CONFIG_FILES([
 	lib/libspl/include/os/freebsd/sys/Makefile
 	lib/libspl/include/os/linux/Makefile
 	lib/libspl/include/os/linux/sys/Makefile
+	lib/libspl/include/os/macos/Makefile
+	lib/libspl/include/os/macos/sys/Makefile
+	lib/libspl/include/os/macos/mach/Makefile
+	lib/libspl/include/os/macos/rpc/Makefile
 	lib/libspl/include/rpc/Makefile
 	lib/libspl/include/sys/Makefile
 	lib/libspl/include/sys/dktp/Makefile
@@ -170,6 +198,9 @@ AC_CONFIG_FILES([
 	lib/libzpool/Makefile
 	lib/libzstd/Makefile
 	lib/libzutil/Makefile
+	lib/os/Makefile
+	lib/os/macos/Makefile
+	lib/os/macos/libdiskmgt/Makefile
 	man/Makefile
 	module/Kbuild
 	module/Makefile
@@ -179,6 +210,9 @@ AC_CONFIG_FILES([
 	module/nvpair/Makefile
 	module/os/linux/spl/Makefile
 	module/os/linux/zfs/Makefile
+	module/os/macos/Makefile
+	module/os/macos/spl/Makefile
+	module/os/macos/zfs/Makefile
 	module/spl/Makefile
 	module/unicode/Makefile
 	module/zcommon/Makefile

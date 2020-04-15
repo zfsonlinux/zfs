@@ -20,8 +20,7 @@ CPPCHECKDIRS += mount_zfs zed zgenhostid zvol_id
 SHELLCHECKDIRS += zed
 endif
 
-PHONY = cppcheck
-cppcheck: $(CPPCHECKDIRS)
-	set -e ; for dir in $(CPPCHECKDIRS) ; do \
-		$(MAKE) -C $$dir cppcheck ; \
-	done
+# Eventually "os" will be "built" by all platforms?
+if BUILD_MACOS
+SUBDIRS += zed os
+endif

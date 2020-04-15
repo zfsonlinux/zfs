@@ -14,7 +14,7 @@ SUBDIRS += udev
 endif
 endif
 if CONFIG_KERNEL
-SUBDIRS += module
+SUBDIRS += module module/os/macos
 
 extradir = $(prefix)/src/zfs-$(VERSION)
 extra_HEADERS = zfs.release.in zfs_config.h.in
@@ -212,11 +212,12 @@ cscopelist:
 PHONY += tags
 tags: ctags etags
 
-PHONY += pkg pkg-dkms pkg-kmod pkg-utils
+PHONY += pkg pkg-dkms pkg-kmod pkg-utils pkg-macos
 pkg: @DEFAULT_PACKAGE@
 pkg-dkms: @DEFAULT_PACKAGE@-dkms
 pkg-kmod: @DEFAULT_PACKAGE@-kmod
 pkg-utils: @DEFAULT_PACKAGE@-utils
+pkg-macos: @DEFAULT_PACKAGE@-macos
 
 include config/rpm.am
 include config/deb.am
