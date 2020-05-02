@@ -5938,10 +5938,13 @@ print_pool(zpool_handle_t *zhp, list_cbdata_t *cb)
 		    zpool_prop_get_feature(zhp, pl->pl_user_prop, property,
 		    sizeof (property)) == 0) {
 			propstr = property;
+		} else if (zfs_prop_user(pl->pl_user_prop) &&
+		    zpool_get_userprop(zhp, pl->pl_user_prop, property,
+		    sizeof (property), NULL, cb->cb_literal) == 0) {
+			propstr = property;
 		} else {
 			propstr = "-";
 		}
-
 
 		/*
 		 * If this is being called in scripted mode, or if this is the
@@ -9801,6 +9804,16 @@ get_callback(zpool_handle_t *zhp, void *data)
 			continue;
 
 		if (pl->pl_prop == ZPROP_INVAL &&
+		    zfs_prop_user(pl->pl_user_prop)) {
+			srctype = ZPROP_SRC_LOCAL;
+
+			if (zpool_get_userprop(zhp, pl->pl_user_prop, value,
+			    sizeof (value), &srctype, cbp->cb_literal) != 0)
+				continue;
+
+			zprop_print_one_property(zpool_get_name(zhp), cbp,
+			    pl->pl_user_prop, value, srctype, NULL, NULL);
+		} else if (pl->pl_prop == ZPROP_INVAL &&
 		    (zpool_prop_feature(pl->pl_user_prop) ||
 		    zpool_prop_unsupported(pl->pl_user_prop))) {
 			srctype = ZPROP_SRC_LOCAL;
