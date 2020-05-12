@@ -49,6 +49,9 @@ function cleanup
 	if is_freebsd && [ -n "$old_corefile" ]; then
 		sysctl kern.corefile=$old_corefile
 	fi
+	if is_macos && [ -n "$old_corefile" ]; then
+		sysctl kern.corefile=$old_corefile
+	fi
 
 	rm -rf $corepath
 
@@ -86,6 +89,11 @@ if is_linux; then
 elif is_freebsd; then
 	old_corefile=$(sysctl -n kern.corefile)
 	log_must sysctl kern.corefile=$corefile
+elif is_macos; then
+	ulimit -c unlimited
+	old_corefile=$(sysctl -n kern.corefile)
+	log_must sysctl kern.corefile=core
+	export ASAN_OPTIONS="abort_on_error=1:disable_coredump=0"
 fi
 ulimit -c unlimited
 
