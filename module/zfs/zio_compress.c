@@ -97,6 +97,10 @@ zio_compress_zeroed_cb(void *data, size_t len, void *private)
 	return (0);
 }
 
+/*
+ * Only compress if it results in saving at least compress_threshold bytes.
+ * Set compress_threshold=0 for reproducibility of ARC checks.
+ */
 size_t
 zio_compress_data(enum zio_compress c, abd_t *src, void *dst, size_t s_len,
     int compress_threshold)
@@ -117,24 +121,11 @@ zio_compress_data(enum zio_compress c, abd_t *src, void *dst, size_t s_len,
 	if (c == ZIO_COMPRESS_EMPTY)
 		return (s_len);
 
-	/*
-	 * If data was compressed and passed ratio checks before -
-	 * we can skip these checks for reproducible results,
-	 * so set compress_threshold=0 for reproducibility of ARC checks.
-	 */
-	if (compress_threshold > 0) {
-		/* Data is already less or equal to compress threshold */
-		if (s_len <= compress_threshold)
-			return (s_len);
+	/* Data is already less or equal to compress threshold */
+	if (s_len <= compress_threshold)
+		return (s_len);
 
-		/*
-		 * Write compressed only if there is at least
-		 * one sector compressed
-		 */
-		d_len = s_len - compress_threshold;
-	} else {
-		d_len = s_len;
-	}
+	d_len = s_len - compress_threshold;
 
 	/* No compression algorithms can read from ABDs directly */
 	void *tmp = abd_borrow_buf_copy(src, s_len);
