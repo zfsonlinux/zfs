@@ -1678,7 +1678,7 @@ zio_write_compress(zio_t *zio)
 	    !(zio->io_flags & ZIO_FLAG_RAW_COMPRESS)) {
 		void *cbuf = zio_buf_alloc(lsize);
 		psize = zio_compress_data(compress, zio->io_abd, cbuf, lsize,
-		    spa->spa_max_ashift);
+		    1 << spa->spa_max_ashift);
 		if (psize == 0 || psize == lsize) {
 			compress = ZIO_COMPRESS_OFF;
 			zio_buf_free(cbuf, lsize);
