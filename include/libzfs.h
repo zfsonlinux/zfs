@@ -960,6 +960,12 @@ _LIBZFS_H int zpool_nextboot(libzfs_handle_t *, uint64_t, uint64_t,
 
 #endif /* __FreeBSD__ */
 
+/*
+ * Manual mounting of snapshots.
+ */
+extern int zfs_snapshot_mount(zfs_handle_t *, const char *, int);
+extern int zfs_snapshot_unmount(zfs_handle_t *, int);
+
 #ifdef	__cplusplus
 }
 #endif

@@ -1464,6 +1464,9 @@ destroy_callback(zfs_handle_t *zhp, void *data)
 	if (zfs_get_type(zhp) == ZFS_TYPE_SNAPSHOT) {
 		cb->cb_snap_count++;
 		fnvlist_add_boolean(cb->cb_batchedsnaps, name);
+#ifdef __APPLE__
+		zfs_snapshot_unmount(zhp, cb->cb_force ? MS_FORCE : 0);
+#endif
 		if (cb->cb_snap_count % 10 == 0 && cb->cb_defer_destroy)
 			error = destroy_batched(cb);
 	} else {
@@ -4163,6 +4166,11 @@ zfs_do_rollback(int argc, char **argv)
 	 * Rollback parent to the given snapshot.
 	 */
 	ret = zfs_rollback(zhp, snap, force);
+
+#ifdef __APPLE__
+	if (ret == 0)
+		zfs_rollback_os(zhp);
+#endif
 
 out:
 	zfs_close(snap);
@@ -7159,6 +7167,39 @@ share_mount(int op, int argc, char **argv)
 
 		(void) fclose(mnttab);
 	} else {
+#if defined (__APPLE__)
+		/*
+		 * OsX can not mount from kernel, users are expected to mount
+		 * by hand using "zfs mount dataset@snapshot".
+		 */
+		zfs_handle_t *zhp;
+
+		if (argc > 1) {
+			(void) fprintf(stderr,
+			    gettext("too many arguments\n"));
+			usage(B_FALSE);
+		}
+
+		if ((zhp = zfs_open(g_zfs, argv[0],
+		    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT)) == NULL) {
+			ret = 1;
+		} else {
+
+			if (zhp->zfs_type & ZFS_TYPE_SNAPSHOT) {
+
+				ret = zfs_snapshot_mount(zhp, options, flags);
+
+			} else {
+
+				ret = share_mount_one(zhp, op, flags, NULL, B_TRUE,
+					options);
+			}
+
+			zfs_close(zhp);
+		}
+
+#else // APPLE
+
 		zfs_handle_t *zhp;
 
 		if (argc > 1) {
@@ -7176,6 +7217,7 @@ share_mount(int op, int argc, char **argv)
 			zfs_commit_all_shares();
 			zfs_close(zhp);
 		}
+#endif // !APPLE
 	}
 
 	free(options);
@@ -7547,9 +7589,23 @@ unshare_unmount(int op, int argc, char **argv)
 			return (unshare_unmount_path(op, argv[0],
 			    flags, B_FALSE));
 
+#if defined (__APPLE__)
+		/* Temporarily, allow mounting snapshots on OS X */
+
+		if ((zhp = zfs_open(g_zfs, argv[0],
+		    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT)) == NULL)
+			return (1);
+
+		if (zhp->zfs_type & ZFS_TYPE_SNAPSHOT) {
+			ret = zfs_snapshot_unmount(zhp, flags);
+			zfs_close(zhp);
+			return (ret);
+		}
+#else
 		if ((zhp = zfs_open(g_zfs, argv[0],
 		    ZFS_TYPE_FILESYSTEM)) == NULL)
 			return (1);
+#endif
 
 		verify(zfs_prop_get(zhp, op == OP_SHARE ?
 		    ZFS_PROP_SHARENFS : ZFS_PROP_MOUNTPOINT,
