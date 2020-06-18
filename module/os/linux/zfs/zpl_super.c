@@ -188,16 +188,17 @@ __zpl_show_options(struct seq_file *seq, zfsvfs_t *zfsvfs)
 	seq_printf(seq, ",%s",
 	    zfsvfs->z_flags & ZSB_XATTR ? "xattr" : "noxattr");
 
-#ifdef CONFIG_FS_POSIX_ACL
 	switch (zfsvfs->z_acl_type) {
 	case ZFS_ACLTYPE_POSIXACL:
 		seq_puts(seq, ",posixacl");
+		break;
+	case ZFS_ACLTYPE_NATIVE:
+		seq_puts(seq, ",acl");
 		break;
 	default:
 		seq_puts(seq, ",noacl");
 		break;
 	}
-#endif /* CONFIG_FS_POSIX_ACL */
 
 	return (0);
 }
