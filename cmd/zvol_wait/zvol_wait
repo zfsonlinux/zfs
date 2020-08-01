@@ -26,18 +26,21 @@ filter_out_deleted_zvols() {
 
 list_zvols() {
 	zfs list -t volume -H -o \
-		name,volmode,receive_resume_token,redact_snaps |
+		name,volmode,receive_resume_token,redact_snaps,keystatus |
 		while read -r zvol_line; do
 		name=$(echo "$zvol_line" | awk '{print $1}')
 		volmode=$(echo "$zvol_line" | awk '{print $2}')
 		token=$(echo "$zvol_line" | awk '{print $3}')
 		redacted=$(echo "$zvol_line" | awk '{print $4}')
+		keystatus=$(echo "$zvol_line" | awk '{print $5}')
 		#
-		# /dev links are not created for zvols with volmode = "none"
-		# or for redacted zvols.
+		# /dev links are not created for zvols with volmode = "none",
+		# redacted zvols, or encrypted zvols for which the key has not
+		# been loaded.
 		#
 		[ "$volmode" = "none" ] && continue
 		[ "$redacted" = "-" ] || continue
+		[ "$keystatus" = "unavailable" ] && continue
 		#
 		# We also also ignore partially received zvols if it is
 		# not an incremental receive, as those won't even have a block
