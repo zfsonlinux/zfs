@@ -116,7 +116,7 @@ MMP_IMPORTED_MSG="pool was previously in use from another system."
 log_must try_pool_import $MMP_POOL "-d $MMP_DIR" "$MMP_IMPORTED_MSG"
 
 # 7. Verify 'zpool import -f $MMP_POOL' can now import the pool.
-log_must import_activity_check $MMP_POOL "-f -d $MMP_DIR"
+log_must import_activity_check $MMP_POOL "-f -d $MMP_DIR" "not_verbose"
 
 # 8 Verify pool may be exported/imported without -f argument.
 log_must zpool export $MMP_POOL

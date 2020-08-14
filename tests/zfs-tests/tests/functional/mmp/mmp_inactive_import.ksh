@@ -87,8 +87,8 @@ done
 log_must zpool export -F $TESTPOOL
 log_must mmp_clear_hostid
 log_must mmp_set_hostid $HOSTID2
-log_mustnot import_activity_check $TESTPOOL ""
-log_must import_activity_check $TESTPOOL "-f"
+log_mustnot import_activity_check $TESTPOOL "" not_verbose
+log_must import_activity_check $TESTPOOL "-f" verbose
 
 # 7. Verify mmp_write and mmp_fail are set correctly
 log_must zpool export -F $TESTPOOL
@@ -106,6 +106,6 @@ log_mustnot import_no_activity_check $TESTPOOL "-f"
 log_must set_tunable64 MULTIHOST_INTERVAL $MMP_INTERVAL_MIN
 log_must mmp_clear_hostid
 log_must mmp_set_hostid $HOSTID1
-log_must import_activity_check $TESTPOOL "-f" $MMP_TEST_DURATION_DEFAULT
+log_must import_activity_check $TESTPOOL "-f" not_verbose $MMP_TEST_DURATION_DEFAULT
 
 log_pass "multihost=on|off inactive pool activity checks passed"
