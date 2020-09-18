@@ -2413,6 +2413,7 @@ spa_init(spa_mode_t mode)
 	zpool_prop_init();
 	zpool_feature_init();
 	spa_config_load();
+	vdev_prop_init();
 	l2arc_start();
 	scan_init();
 	qat_init();

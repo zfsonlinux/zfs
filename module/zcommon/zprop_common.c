@@ -53,6 +53,8 @@ zprop_get_proptable(zfs_type_t type)
 {
 	if (type == ZFS_TYPE_POOL)
 		return (zpool_prop_get_table());
+	else if (type == ZFS_TYPE_VDEV)
+		return (vdev_prop_get_table());
 	else
 		return (zfs_prop_get_table());
 }
@@ -62,6 +64,8 @@ zprop_get_numprops(zfs_type_t type)
 {
 	if (type == ZFS_TYPE_POOL)
 		return (ZPOOL_NUM_PROPS);
+	else if (type == ZFS_TYPE_VDEV)
+		return (VDEV_NUM_PROPS);
 	else
 		return (ZFS_NUM_PROPS);
 }
@@ -235,6 +239,8 @@ propname_match(const char *p, size_t len, zprop_desc_t *prop_entry)
 	int c;
 #endif
 
+	ASSERT(propname != NULL);
+
 	if (len == strlen(propname) &&
 	    strncmp(p, propname, len) == 0)
 		return (B_TRUE);
@@ -391,6 +397,18 @@ zprop_valid_for_type(int prop, zfs_type_t type, boolean_t headcheck)
 	return ((prop_tbl[prop].pd_types & type) != 0);
 }
 
+/*
+ * For user property names, we allow all lowercase alphanumeric characters, plus
+ * a few useful punctuation characters.
+ */
+int
+zprop_valid_char(char c)
+{
+	return ((c >= 'a' && c <= 'z') ||
+	    (c >= '0' && c <= '9') ||
+	    c == '-' || c == '_' || c == '.' || c == ':');
+}
+
 #ifndef _KERNEL
 
 /*
@@ -477,4 +495,5 @@ EXPORT_SYMBOL(zprop_index_to_string);
 EXPORT_SYMBOL(zprop_random_value);
 EXPORT_SYMBOL(zprop_values);
 EXPORT_SYMBOL(zprop_valid_for_type);
+EXPORT_SYMBOL(zprop_valid_char);
 #endif
