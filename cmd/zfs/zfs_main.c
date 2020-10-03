@@ -275,10 +275,12 @@ get_usage(zfs_help_t idx)
 		    "\tcreate [-Pnpsv] [-b blocksize] [-o property=value] ... "
 		    "-V <size> <volume>\n"));
 	case HELP_DESTROY:
-		return (gettext("\tdestroy [-fnpRrv] <filesystem|volume>\n"
-		    "\tdestroy [-dnpRrv] "
+		return (gettext("\tdestroy [-fnpRrv] [-t type[,...]] "
+		    "<filesystem|volume>\n"
+		    "\tdestroy [-dnpRrv] [-t type[,...]] "
 		    "<filesystem|volume>@<snap>[%<snap>][,...]\n"
-		    "\tdestroy <filesystem|volume>#<bookmark>\n"));
+		    "\tdestroy [-t type[,...]] "
+		    "<filesystem|volume>#<bookmark>\n"));
 	case HELP_GET:
 		return (gettext("\tget [-rHp] [-d max] "
 		    "[-o \"all\" | field[,...]]\n"
@@ -605,6 +607,48 @@ usage(boolean_t requested)
 	}
 
 	exit(requested ? 0 : 2);
+}
+
+static zfs_type_t
+getopt_object_types(void)
+{
+	char *value;
+	zfs_type_t types = 0;
+
+	while (*optarg != '\0') {
+		static char *type_subopts[] = { "filesystem",
+		    "volume", "snapshot", "snap", "bookmark",
+		    "all", NULL };
+		switch (getsubopt(&optarg, type_subopts,
+		    &value)) {
+
+		case 0:
+			types |= ZFS_TYPE_FILESYSTEM;
+			break;
+		case 1:
+			types |= ZFS_TYPE_VOLUME;
+			break;
+		case 2:
+		case 3:
+			types |= ZFS_TYPE_SNAPSHOT;
+			break;
+		case 4:
+			types |= ZFS_TYPE_BOOKMARK;
+			break;
+
+		case 5:
+			types = ZFS_TYPE_DATASET |
+			    ZFS_TYPE_BOOKMARK;
+			break;
+		default:
+			(void) fprintf(stderr,
+			    gettext("invalid type '%s'\n"),
+			    value);
+			usage(B_FALSE);
+		}
+	}
+
+	return (types);
 }
 
 /*
@@ -1170,9 +1214,10 @@ badusage:
 }
 
 /*
- * zfs destroy [-rRf] <fs, vol>
- * zfs destroy [-rRd] <snap>
+ * zfs destroy [-rRf] [-t type[,...]] <fs, vol>
+ * zfs destroy [-rRd] [-t type[,...]] <snap>
  *
+ *	-t	Restrict which object types can be destroyed.
  *	-r	Recursively destroy all children
  *	-R	Recursively destroy all dependents, including clones
  *	-f	Force unmounting of any dependents
@@ -1181,6 +1226,17 @@ badusage:
  * Destroys the given dataset.  By default, it will unmount any filesystems,
  * and refuse to destroy a dataset that has any dependents.  A dependent can
  * either be a child, or a clone of a child.
+ *
+ * Specify the object type to make accidental damage with 'zfs destroy`
+ * less likely. For example:
+ *
+ *  1. recursively destroy all snapshots or bookmarks of a given name
+ *     more safely by passing '-t snapshot' or '-t bookmark' before
+ *     passing `-r` or any snapshot or bookmark names.
+ *
+ *  2. delete a specific volume without risking an early execution
+ *     destroying a parent dataset, by passing `-t volume` before
+ *     entering the path to the volume.
  */
 typedef struct destroy_cbdata {
 	boolean_t	cb_first;
@@ -1493,10 +1549,11 @@ zfs_do_destroy(int argc, char **argv)
 	int c;
 	zfs_handle_t *zhp = NULL;
 	char *at, *pound;
-	zfs_type_t type = ZFS_TYPE_DATASET;
+	zfs_type_t types = ZFS_TYPE_DATASET;
+	boolean_t types_specified = B_FALSE;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "vpndfrR")) != -1) {
+	while ((c = getopt(argc, argv, "vpnt:dfrR")) != -1) {
 		switch (c) {
 		case 'v':
 			cb.cb_verbose = B_TRUE;
@@ -1508,9 +1565,20 @@ zfs_do_destroy(int argc, char **argv)
 		case 'n':
 			cb.cb_dryrun = B_TRUE;
 			break;
+		case 't':
+			types_specified = B_TRUE;
+			types = getopt_object_types();
+			break;
 		case 'd':
 			cb.cb_defer_destroy = B_TRUE;
-			type = ZFS_TYPE_SNAPSHOT;
+			if (types_specified && types != ZFS_TYPE_SNAPSHOT) {
+				(void) fprintf(stderr, gettext("-t and -d "
+				    "conflict. -d can only be used with "
+				    "snapshots\n"));
+				usage(B_FALSE);
+			} else {
+				types = ZFS_TYPE_SNAPSHOT;
+			}
 			break;
 		case 'f':
 			cb.cb_force = B_TRUE;
@@ -1521,6 +1589,11 @@ zfs_do_destroy(int argc, char **argv)
 		case 'R':
 			cb.cb_recurse = B_TRUE;
 			cb.cb_doclones = B_TRUE;
+			break;
+		case ':':
+			(void) fprintf(stderr, gettext("missing argument for "
+			    "'%c' option\n"), optopt);
+			usage(B_FALSE);
 			break;
 		case '?':
 		default:
@@ -1546,6 +1619,13 @@ zfs_do_destroy(int argc, char **argv)
 	at = strchr(argv[0], '@');
 	pound = strchr(argv[0], '#');
 	if (at != NULL) {
+
+		if (types_specified && (types & ZFS_TYPE_SNAPSHOT) == 0) {
+			(void) fprintf(stderr, gettext("cannot destroy '%s'; "
+			    "restricted by the -t option.\n"), argv[0]);
+			rv = 1;
+			goto out;
+		}
 
 		/* Build the list of snaps to destroy in cb_nvl. */
 		cb.cb_nvl = fnvlist_alloc();
@@ -1612,6 +1692,13 @@ zfs_do_destroy(int argc, char **argv)
 		int err;
 		nvlist_t *nvl;
 
+		if (types_specified && (types & ZFS_TYPE_BOOKMARK) == 0) {
+			(void) fprintf(stderr, gettext("cannot destroy '%s'; "
+			    "restricted by the -t option.\n"), argv[0]);
+			rv = 1;
+			goto out;
+		}
+
 		if (cb.cb_dryrun) {
 			(void) fprintf(stderr,
 			    "dryrun is not supported with bookmark\n");
@@ -1657,7 +1744,7 @@ zfs_do_destroy(int argc, char **argv)
 		return (err);
 	} else {
 		/* Open the given dataset */
-		if ((zhp = zfs_open(g_zfs, argv[0], type)) == NULL)
+		if ((zhp = zfs_open(g_zfs, argv[0], types)) == NULL)
 			return (1);
 
 		cb.cb_target = zhp;
@@ -2012,40 +2099,8 @@ zfs_do_get(int argc, char **argv)
 			break;
 
 		case 't':
-			types = 0;
+			types = getopt_object_types();
 			flags &= ~ZFS_ITER_PROP_LISTSNAPS;
-			while (*optarg != '\0') {
-				static char *type_subopts[] = { "filesystem",
-				    "volume", "snapshot", "snap", "bookmark",
-				    "all", NULL };
-
-				switch (getsubopt(&optarg, type_subopts,
-				    &value)) {
-				case 0:
-					types |= ZFS_TYPE_FILESYSTEM;
-					break;
-				case 1:
-					types |= ZFS_TYPE_VOLUME;
-					break;
-				case 2:
-				case 3:
-					types |= ZFS_TYPE_SNAPSHOT;
-					break;
-				case 4:
-					types |= ZFS_TYPE_BOOKMARK;
-					break;
-				case 5:
-					types = ZFS_TYPE_DATASET |
-					    ZFS_TYPE_BOOKMARK;
-					break;
-
-				default:
-					(void) fprintf(stderr,
-					    gettext("invalid type '%s'\n"),
-					    value);
-					usage(B_FALSE);
-				}
-			}
 			break;
 
 		case '?':
@@ -3464,7 +3519,6 @@ zfs_do_list(int argc, char **argv)
 	boolean_t types_specified = B_FALSE;
 	char *fields = NULL;
 	list_cbdata_t cb = { 0 };
-	char *value;
 	int limit = 0;
 	int ret = 0;
 	zfs_sort_column_t *sortcol = NULL;
@@ -3506,40 +3560,9 @@ zfs_do_list(int argc, char **argv)
 			}
 			break;
 		case 't':
-			types = 0;
+			types = getopt_object_types();
 			types_specified = B_TRUE;
 			flags &= ~ZFS_ITER_PROP_LISTSNAPS;
-			while (*optarg != '\0') {
-				static char *type_subopts[] = { "filesystem",
-				    "volume", "snapshot", "snap", "bookmark",
-				    "all", NULL };
-
-				switch (getsubopt(&optarg, type_subopts,
-				    &value)) {
-				case 0:
-					types |= ZFS_TYPE_FILESYSTEM;
-					break;
-				case 1:
-					types |= ZFS_TYPE_VOLUME;
-					break;
-				case 2:
-				case 3:
-					types |= ZFS_TYPE_SNAPSHOT;
-					break;
-				case 4:
-					types |= ZFS_TYPE_BOOKMARK;
-					break;
-				case 5:
-					types = ZFS_TYPE_DATASET |
-					    ZFS_TYPE_BOOKMARK;
-					break;
-				default:
-					(void) fprintf(stderr,
-					    gettext("invalid type '%s'\n"),
-					    value);
-					usage(B_FALSE);
-				}
-			}
 			break;
 		case ':':
 			(void) fprintf(stderr, gettext("missing argument for "
