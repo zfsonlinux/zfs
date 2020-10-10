@@ -4486,6 +4486,7 @@ zfs_check_settable(const char *dsname, nvpair_t *pair, cred_t *cr)
 				}
 				spa_close(spa, FTAG);
 			}
+
 		}
 		break;
 
