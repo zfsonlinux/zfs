@@ -89,8 +89,8 @@
  * functions.
  *
  * As an additional feature, linear and scatter ABD's can be stitched together
- * by using the gang ABD type (abd_alloc_gang_abd()). This allows for
- * multiple ABDs to be viewed as a singular ABD.
+ * by using the gang ABD type (abd_alloc_gang()). This allows for multiple ABDs
+ * to be viewed as a singular ABD.
  *
  * It is possible to make all ABDs linear by setting zfs_abd_scatter_enabled to
  * B_FALSE.
@@ -113,7 +113,8 @@ abd_verify(abd_t *abd)
 	ASSERT3U(abd->abd_flags, ==, abd->abd_flags & (ABD_FLAG_LINEAR |
 	    ABD_FLAG_OWNER | ABD_FLAG_META | ABD_FLAG_MULTI_ZONE |
 	    ABD_FLAG_MULTI_CHUNK | ABD_FLAG_LINEAR_PAGE | ABD_FLAG_GANG |
-	    ABD_FLAG_GANG_FREE | ABD_FLAG_ZEROS | ABD_FLAG_ALLOCD));
+	    ABD_FLAG_GANG_FREE | ABD_FLAG_ZEROS | ABD_FLAG_ALLOCD |
+	    ABD_FLAG_FROM_PAGES));
 #ifdef ZFS_DEBUG
 	IMPLY(abd->abd_parent != NULL, !(abd->abd_flags & ABD_FLAG_OWNER));
 #endif
@@ -135,7 +136,7 @@ abd_verify(abd_t *abd)
 	}
 }
 
-static void
+void
 abd_init_struct(abd_t *abd)
 {
 	list_link_init(&abd->abd_gang_link);
@@ -237,6 +238,7 @@ abd_free_linear(abd_t *abd)
 		abd_free_linear_page(abd);
 		return;
 	}
+
 	if (abd->abd_flags & ABD_FLAG_META) {
 		zio_buf_free(ABD_LINEAR_BUF(abd), abd->abd_size);
 	} else {
@@ -917,7 +919,7 @@ abd_iterate_func2(abd_t *dabd, abd_t *sabd, size_t doff, size_t soff,
 {
 	int ret = 0;
 	struct abd_iter daiter, saiter;
-	boolean_t dabd_is_gang_abd, sabd_is_gang_abd;
+	boolean_t dabd_gang, sabd_gang;
 	abd_t *c_dabd, *c_sabd;
 
 	if (size == 0)
@@ -929,15 +931,14 @@ abd_iterate_func2(abd_t *dabd, abd_t *sabd, size_t doff, size_t soff,
 	ASSERT3U(doff + size, <=, dabd->abd_size);
 	ASSERT3U(soff + size, <=, sabd->abd_size);
 
-	dabd_is_gang_abd = abd_is_gang(dabd);
-	sabd_is_gang_abd = abd_is_gang(sabd);
+	dabd_gang = abd_is_gang(dabd);
+	sabd_gang = abd_is_gang(sabd);
 	c_dabd = abd_init_abd_iter(dabd, &daiter, doff);
 	c_sabd = abd_init_abd_iter(sabd, &saiter, soff);
 
 	while (size > 0) {
 		/* if we are at the end of the gang ABD we are done */
-		if ((dabd_is_gang_abd && !c_dabd) ||
-		    (sabd_is_gang_abd && !c_sabd))
+		if ((dabd_gang && !c_dabd) ||(sabd_gang && !c_sabd))
 			break;
 
 		abd_iter_map(&daiter);
@@ -1024,18 +1025,18 @@ abd_raidz_gen_iterate(abd_t **cabds, abd_t *dabd,
 	unsigned long flags __maybe_unused = 0;
 	abd_t *c_cabds[3];
 	abd_t *c_dabd = NULL;
-	boolean_t cabds_is_gang_abd[3];
-	boolean_t dabd_is_gang_abd = B_FALSE;
+	boolean_t cabds_gang[3];
+	boolean_t dabd_gang = B_FALSE;
 
 	ASSERT3U(parity, <=, 3);
 
 	for (i = 0; i < parity; i++) {
-		cabds_is_gang_abd[i] = abd_is_gang(cabds[i]);
+		cabds_gang[i] = abd_is_gang(cabds[i]);
 		c_cabds[i] = abd_init_abd_iter(cabds[i], &caiters[i], 0);
 	}
 
 	if (dabd) {
-		dabd_is_gang_abd = abd_is_gang(dabd);
+		dabd_gang = abd_is_gang(dabd);
 		c_dabd = abd_init_abd_iter(dabd, &daiter, 0);
 	}
 
@@ -1044,7 +1045,7 @@ abd_raidz_gen_iterate(abd_t **cabds, abd_t *dabd,
 	abd_enter_critical(flags);
 	while (csize > 0) {
 		/* if we are at the end of the gang ABD we are done */
-		if (dabd_is_gang_abd && !c_dabd)
+		if (dabd_gang && !c_dabd)
 			break;
 
 		for (i = 0; i < parity; i++) {
@@ -1052,7 +1053,7 @@ abd_raidz_gen_iterate(abd_t **cabds, abd_t *dabd,
 			 * If we are at the end of the gang ABD we are
 			 * done.
 			 */
-			if (cabds_is_gang_abd[i] && !c_cabds[i])
+			if (cabds_gang[i] && !c_cabds[i])
 				break;
 			abd_iter_map(&caiters[i]);
 			caddrs[i] = caiters[i].iter_mapaddr;
@@ -1140,16 +1141,16 @@ abd_raidz_rec_iterate(abd_t **cabds, abd_t **tabds,
 	struct abd_iter xiters[3];
 	void *caddrs[3], *xaddrs[3];
 	unsigned long flags __maybe_unused = 0;
-	boolean_t cabds_is_gang_abd[3];
-	boolean_t tabds_is_gang_abd[3];
+	boolean_t cabds_gang[3];
+	boolean_t tabds_gang[3];
 	abd_t *c_cabds[3];
 	abd_t *c_tabds[3];
 
 	ASSERT3U(parity, <=, 3);
 
 	for (i = 0; i < parity; i++) {
-		cabds_is_gang_abd[i] = abd_is_gang(cabds[i]);
-		tabds_is_gang_abd[i] = abd_is_gang(tabds[i]);
+		cabds_gang[i] = abd_is_gang(cabds[i]);
+		tabds_gang[i] = abd_is_gang(tabds[i]);
 		c_cabds[i] =
 		    abd_init_abd_iter(cabds[i], &citers[i], 0);
 		c_tabds[i] =
@@ -1164,9 +1165,9 @@ abd_raidz_rec_iterate(abd_t **cabds, abd_t **tabds,
 			 * If we are at the end of the gang ABD we
 			 * are done.
 			 */
-			if (cabds_is_gang_abd[i] && !c_cabds[i])
+			if (cabds_gang[i] && !c_cabds[i])
 				break;
-			if (tabds_is_gang_abd[i] && !c_tabds[i])
+			if (tabds_gang[i] && !c_tabds[i])
 				break;
 			abd_iter_map(&citers[i]);
 			abd_iter_map(&xiters[i]);

@@ -1100,6 +1100,10 @@ zio_write(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
     const zbookmark_phys_t *zb)
 {
 	zio_t *zio;
+	enum zio_stage pipeline = zp->zp_direct_write ?
+	    ZIO_DIRECT_WRITE_PIPELINE :
+	    (flags & ZIO_FLAG_DDT_CHILD) ? ZIO_DDT_CHILD_WRITE_PIPELINE :
+	    ZIO_WRITE_PIPELINE;
 
 	ASSERT(zp->zp_checksum >= ZIO_CHECKSUM_OFF &&
 	    zp->zp_checksum < ZIO_CHECKSUM_FUNCTIONS &&
@@ -1112,8 +1116,7 @@ zio_write(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 
 	zio = zio_create(pio, spa, txg, bp, data, lsize, psize, done, private,
 	    ZIO_TYPE_WRITE, priority, flags, NULL, 0, zb,
-	    ZIO_STAGE_OPEN, (flags & ZIO_FLAG_DDT_CHILD) ?
-	    ZIO_DDT_CHILD_WRITE_PIPELINE : ZIO_WRITE_PIPELINE);
+	    ZIO_STAGE_OPEN, pipeline);
 
 	zio->io_ready = ready;
 	zio->io_children_ready = children_ready;
@@ -2858,6 +2861,7 @@ zio_write_gang_block(zio_t *pio, metaslab_class_t *mc)
 		zp.zp_nopwrite = B_FALSE;
 		zp.zp_encrypt = gio->io_prop.zp_encrypt;
 		zp.zp_byteorder = gio->io_prop.zp_byteorder;
+		zp.zp_direct_write = B_FALSE;
 		bzero(zp.zp_salt, ZIO_DATA_SALT_LEN);
 		bzero(zp.zp_iv, ZIO_DATA_IV_LEN);
 		bzero(zp.zp_mac, ZIO_DATA_MAC_LEN);

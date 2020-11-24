@@ -31,12 +31,12 @@
 
 static dataset_kstat_values_t empty_dataset_kstats = {
 	{ "dataset_name",	KSTAT_DATA_STRING },
-	{ "writes",	KSTAT_DATA_UINT64 },
-	{ "nwritten",	KSTAT_DATA_UINT64 },
-	{ "reads",	KSTAT_DATA_UINT64 },
-	{ "nread",	KSTAT_DATA_UINT64 },
-	{ "nunlinks",	KSTAT_DATA_UINT64 },
-	{ "nunlinked",	KSTAT_DATA_UINT64 },
+	{ "writes",		KSTAT_DATA_UINT64 },
+	{ "nwritten",		KSTAT_DATA_UINT64 },
+	{ "reads",		KSTAT_DATA_UINT64 },
+	{ "nread",		KSTAT_DATA_UINT64 },
+	{ "nunlinks",		KSTAT_DATA_UINT64 },
+	{ "nunlinked",		KSTAT_DATA_UINT64 },
 };
 
 static int
@@ -171,8 +171,7 @@ dataset_kstats_destroy(dataset_kstats_t *dk)
 }
 
 void
-dataset_kstats_update_write_kstats(dataset_kstats_t *dk,
-    int64_t nwritten)
+dataset_kstats_update_write_kstats(dataset_kstats_t *dk, int64_t nwritten)
 {
 	ASSERT3S(nwritten, >=, 0);
 
@@ -184,8 +183,7 @@ dataset_kstats_update_write_kstats(dataset_kstats_t *dk,
 }
 
 void
-dataset_kstats_update_read_kstats(dataset_kstats_t *dk,
-    int64_t nread)
+dataset_kstats_update_read_kstats(dataset_kstats_t *dk, int64_t nread)
 {
 	ASSERT3S(nread, >=, 0);
 

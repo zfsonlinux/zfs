@@ -34,13 +34,31 @@
 #include_next <sys/uio.h>
 #include <sys/_uio.h>
 #include <sys/debug.h>
+#include <sys/sysmacros.h>
+
+/*
+ * uio_extflg: extended flags
+ */
+#define	UIO_DIRECT	0x0001	/* Direct IO requset */
 
 typedef	struct iovec	iovec_t;
 typedef	enum uio_seg	zfs_uio_seg_t;
 typedef	enum uio_rw	zfs_uio_rw_t;
 
+/*
+ * This structure is used when doing Direct IO.
+ */
+typedef struct {
+	vm_page_t	*pages;
+	int		npages;
+	offset_t	page_offset;
+} zfs_uio_dio_t;
+
 typedef struct zfs_uio {
 	struct uio	*uio;
+	offset_t	uio_soffset;
+	uint16_t	uio_extflg;
+	zfs_uio_dio_t	uio_dio;
 } zfs_uio_t;
 
 #define	GET_UIO_STRUCT(u)	(u)->uio
@@ -52,6 +70,7 @@ typedef struct zfs_uio {
 #define	zfs_uio_iovbase(u, idx)	GET_UIO_STRUCT(u)->uio_iov[(idx)].iov_base
 #define	zfs_uio_td(u)		GET_UIO_STRUCT(u)->uio_td
 #define	zfs_uio_rw(u)		GET_UIO_STRUCT(u)->uio_rw
+#define	zfs_uio_soffset(u)	(u)->uio_soffset
 #define	zfs_uio_fault_disable(u, set)
 #define	zfs_uio_prefaultpages(size, u)	(0)
 
@@ -71,7 +90,11 @@ zfs_uio_advance(zfs_uio_t *uio, size_t size)
 static __inline void
 zfs_uio_init(zfs_uio_t *uio, struct uio *uio_s)
 {
-	GET_UIO_STRUCT(uio) = uio_s;
+	bzero(uio, sizeof (zfs_uio_t));
+	if (uio_s != NULL) {
+		GET_UIO_STRUCT(uio) = uio_s;
+		zfs_uio_soffset(uio) = uio_s->uio_offset;
+	}
 }
 
 int zfs_uio_fault_move(void *p, size_t n, zfs_uio_rw_t dir, zfs_uio_t *uio);

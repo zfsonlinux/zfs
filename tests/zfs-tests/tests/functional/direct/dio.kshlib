@@ -1,0 +1,188 @@
+#
+# CDDL HEADER START
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2021 by Lawrence Livermore National Security, LLC.
+#
+
+. $STF_SUITE/include/libtest.shlib
+. $STF_SUITE/tests/functional/direct/dio.cfg
+
+function dio_cleanup
+{
+	if poolexists $TESTPOOL1; then
+		destroy_pool $TESTPOOL1
+	fi
+
+	rm -f $DIO_VDEVS
+}
+
+#
+# Generate an IO workload using fio and then verify the resulting data.
+#
+function dio_and_verify # mode file-size block-size directory extra-args
+{
+	typeset mode=$1
+	typeset size=$2
+	typeset bs=$3
+	typeset mntpnt=$4
+	typeset extra_args=$5
+
+	# Invoke an fio workload via direct IO.
+	log_must fio --directory=$mntpnt --name=direct-$mode \
+	    --rw=$mode --size=$size --bs=$bs --direct=1 --numjobs=1 \
+	    --verify=sha1 --ioengine=sync --fallocate=none \
+	    --group_reporting --minimal $extra_args
+
+	# Verify the files written using buffered IO.
+	log_must fio --directory=$mntpnt --name=direct-verify \
+	    --rw=read --size=$size --bs=$bs --direct=0 --numjobs=1 \
+	    --verify_only --group_reporting --minimal
+
+	log_must rm -f "$mntpnt/direct-*"
+}
+
+#
+# Get the value of a counter from
+# Linux: /proc/spl/kstat/zfs/$pool/iostats file.
+# FreeBSD: kstat.zfs.$pool.msic.iostats.$stat
+#
+function get_iostats_stat # pool stat
+{
+	typeset pool=$1
+	typeset stat=$2
+
+	if is_linux; then
+		iostats_file=/proc/spl/kstat/zfs/$pool/iostats
+		val=$(grep -m1 "$stat" $iostats_file | awk '{ print $3 }')
+	else
+		val=$(sysctl -n kstat.zfs.$pool.misc.iostats.$stat)
+	fi
+	if [[ -z "$val" ]]; then
+		log_fail "Unable to read $stat counter"
+	fi
+
+	echo "$val"
+}
+
+#
+# Evict any buffered blocks by overwritting them using an O_DIRECT request.
+#
+function evict_blocks
+{
+	typeset pool=$1
+	typeset file=$2
+	typeset size=$3
+
+	log_must stride_dd -i /dev/urandom -o $file -b $size -c 1 -D
+}
+
+#
+# Perform a stride_dd write command to the file with the given arguments.
+# Then verify the minimum expected number of blocks were written as either
+# buffered IO (by the ARC), or direct IO to the application (dd).
+#
+function check_write # pool file bs count seek flags buf_wr dio_wr
+{
+	typeset pool=$1
+	typeset file=$2
+	typeset bs=$3
+	typeset count=$4
+	typeset seek=$5
+	typeset flags=$6
+	typeset buf_wr_expect=$7
+	typeset dio_wr_expect=$8
+
+	log_note "Checking $count * $bs write(s) at offset $seek, $flags"
+
+	prev_buf_wr=$(get_iostats_stat $pool arc_write_count)
+	prev_dio_wr=$(get_iostats_stat $pool direct_write_count)
+
+	log_must stride_dd -i /dev/urandom -o $file -b $bs -c $count \
+	    -k $seek $flags
+
+	curr_buf_wr=$(get_iostats_stat $pool arc_write_count)
+	buf_wr_actual=$((curr_buf_wr - prev_buf_wr))
+
+	curr_dio_wr=$(get_iostats_stat $pool direct_write_count)
+	dio_wr_actual=$((curr_dio_wr - prev_dio_wr))
+
+	if [[ $buf_wr_actual -lt $buf_wr_expect ]]; then
+		if is_linux; then
+			cat /proc/spl/kstat/zfs/$pool/iostats
+		else
+			sysctl kstat.zfs.$pool.misc.iostats
+		fi
+		log_fail "Buffered writes $buf_wr_actual of $buf_wr_expect"
+	fi
+
+	if [[ $dio_wr_actual -lt $dio_wr_expect ]]; then
+		if is_linux; then
+			cat /proc/spl/kstat/zfs/$pool/iostats
+		else
+			sysctl kstat.zfs.$pool.misc.iostats
+		fi
+		log_fail "Direct writes $dio_wr_actual of $dio_wr_expect"
+	fi
+}
+
+#
+# Perform a stride_dd read command to the file with the given arguments.
+# Then verify the minimum expected number of blocks were read as either
+# buffered IO (by the ARC), or direct IO to the application (dd).
+#
+function check_read # pool file bs count skip flags buf_rd dio_rd
+{
+	typeset pool=$1
+	typeset file=$2
+	typeset bs=$3
+	typeset count=$4
+	typeset skip=$5
+	typeset flags=$6
+	typeset buf_rd_expect=$7
+	typeset dio_rd_expect=$8
+
+	log_note "Checking $count * $bs read(s) at offset $skip, $flags"
+
+	prev_buf_rd=$(get_iostats_stat $pool arc_read_count)
+	prev_dio_rd=$(get_iostats_stat $pool direct_read_count)
+
+	log_must stride_dd -i $file -o /dev/null -b $bs -c $count \
+	    -p $skip $flags
+
+	curr_buf_rd=$(get_iostats_stat $pool arc_read_count)
+	buf_rd_actual=$((curr_buf_rd - prev_buf_rd))
+
+	curr_dio_rd=$(get_iostats_stat $pool direct_read_count)
+	dio_rd_actual=$((curr_dio_rd - prev_dio_rd))
+
+	if [[ $buf_rd_actual -lt $buf_rd_expect ]]; then
+		if is_linux; then
+			cat /proc/spl/kstat/zfs/$pool/iostats
+		else
+			sysctl kstat.zfs.$pool.misc.iostats
+		fi
+		log_fail "Buffered reads $buf_rd_actual of $buf_rd_expect"
+	fi
+
+	if [[ $dio_rd_actual -lt $dio_rd_expect ]]; then
+		if is_linux; then
+			cat /proc/spl/kstat/zfs/$pool/iostats
+		else
+			sysctl kstat.zfs.$pool.misc.iostats
+		fi
+		log_fail "Direct reads $dio_rd_actual of $dio_rd_expect"
+	fi
+}

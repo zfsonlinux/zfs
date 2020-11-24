@@ -74,6 +74,42 @@ AC_DEFUN([ZFS_AC_KERNEL_SRC_VFS_IOV_ITER], [
 
 		bytes = copy_from_iter((void *)&buf, size, &iter);
 	])
+
+	ZFS_LINUX_TEST_SRC([iov_iter_bvec], [
+		#include <linux/uio.h>
+		#include <linux/bvec.h>
+	], [
+		struct iov_iter iter = { 0 };
+		unsigned int direction = READ;
+		const struct bio_vec *bvec = NULL;
+		unsigned long nr_segs = 1;
+		size_t count = 4096;
+
+		iov_iter_bvec(&iter, direction, bvec, nr_segs, count);
+	])
+
+	ZFS_LINUX_TEST_SRC([iov_iter_get_pages], [
+		#include <linux/uio.h>
+	], [
+		struct iov_iter iter = { 0 };
+		struct page **pages = NULL;
+		size_t maxsize = 4096;
+		unsigned maxpages = 1;
+		size_t start;
+		size_t ret __attribute__ ((unused));
+
+		ret = iov_iter_get_pages(&iter, pages, maxsize, maxpages,
+		    &start);
+	])
+
+	ZFS_LINUX_TEST_SRC([iov_iter_type], [
+		#include <linux/uio.h>
+	], [
+		const struct iov_iter *iter = NULL;
+		enum iter_type ret __attribute__ ((unused));
+
+		ret = iov_iter_type(iter);
+	])
 ])
 
 AC_DEFUN([ZFS_AC_KERNEL_VFS_IOV_ITER], [
@@ -149,6 +185,26 @@ AC_DEFUN([ZFS_AC_KERNEL_VFS_IOV_ITER], [
 		enable_vfs_iov_iter="no"
 	])
 
+	AC_MSG_CHECKING([whether iov_iter_bvec() is available])
+		ZFS_LINUX_TEST_RESULT([iov_iter_bvec], [
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_IOV_ITER_BVEC, 1,
+		    [iov_iter_bvec() is available])
+	], [
+		AC_MSG_RESULT(no)
+		emable_vfs_iov_iter="no"
+	])
+
+	AC_MSG_CHECKING([whether iov_iter_get_pages() is available])
+		ZFS_LINUX_TEST_RESULT([iov_iter_get_pages], [
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_IOV_ITER_GET_PAGES, 1,
+		    [iov_iter_get_pages() is available])
+	], [
+		AC_MSG_RESULT(no)
+		enable_vfs_iov_iter="no"
+	])
+
 	dnl #
 	dnl # As of the 4.9 kernel support is provided for iovecs, kvecs,
 	dnl # bvecs and pipes in the iov_iter structure.  As long as the
@@ -158,5 +214,17 @@ AC_DEFUN([ZFS_AC_KERNEL_VFS_IOV_ITER], [
 	AS_IF([test "x$enable_vfs_iov_iter" = "xyes"], [
 		AC_DEFINE(HAVE_VFS_IOV_ITER, 1,
 		    [All required iov_iter interfaces are available])
+
+		dnl #
+		dnl # iov_iter_type() was not available till 4.20.
+		dnl #
+		AC_MSG_CHECKING([whether iov_iter_type() is available])
+		ZFS_LINUX_TEST_RESULT([iov_iter_type], [
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(HAVE_IOV_ITER_TYPE, 1,
+			    [iov_iter_type() is available])
+		], [
+			AC_MSG_RESULT(no)
+		])
 	])
 ])

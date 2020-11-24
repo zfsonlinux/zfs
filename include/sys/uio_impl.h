@@ -40,10 +40,35 @@
 #define	_SYS_UIO_IMPL_H
 
 #include <sys/uio.h>
+#include <sys/sysmacros.h>
 
 extern int zfs_uiomove(void *, size_t, zfs_uio_rw_t, zfs_uio_t *);
 extern int zfs_uiocopy(void *, size_t, zfs_uio_rw_t, zfs_uio_t *, size_t *);
 extern void zfs_uioskip(zfs_uio_t *, size_t);
+extern void zfs_uio_free_dio_pages(zfs_uio_t *, zfs_uio_rw_t);
+extern int zfs_uio_get_dio_pages_alloc(zfs_uio_t *, zfs_uio_rw_t);
+extern boolean_t zfs_uio_page_aligned(zfs_uio_t *);
+
+static inline boolean_t
+zfs_dio_page_aligned(void *buf)
+{
+	return ((((unsigned long)(buf) & (PAGESIZE - 1)) == 0) ?
+	    B_TRUE : B_FALSE);
+}
+
+static inline boolean_t
+zfs_dio_blksz_aligned(uint64_t offset, uint64_t size, uint64_t blksz)
+{
+	return ((((offset % blksz) == 0) && ((size % blksz) == 0)) ?
+	    B_TRUE : B_FALSE);
+}
+
+static inline boolean_t
+zfs_uio_blksz_aligned(zfs_uio_t *uio, uint64_t blksz)
+{
+	return (zfs_dio_blksz_aligned(zfs_uio_offset(uio),
+	    zfs_uio_resid(uio), blksz));
+}
 
 static inline void
 zfs_uio_iov_at_index(zfs_uio_t *uio, uint_t idx, void **base, uint64_t *len)
