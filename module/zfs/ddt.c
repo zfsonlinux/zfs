@@ -427,7 +427,7 @@ ddt_stat_add(ddt_stat_t *dst, const ddt_stat_t *src, uint64_t neg)
 		*d++ += (*s++ ^ neg) - neg;
 }
 
-static void
+void
 ddt_stat_update(ddt_t *ddt, ddt_entry_t *dde, uint64_t neg)
 {
 	ddt_stat_t dds;
@@ -491,12 +491,27 @@ ddt_get_dedup_object_stats(spa_t *spa, ddt_object_t *ddo_total)
 		}
 	}
 
+	spa->spa_dedup_table_size = ddo_total->ddo_dspace;
+	spa->spa_dedup_table_count = ddo_total->ddo_count;
+
 	/* ... and compute the averages. */
 	if (ddo_total->ddo_count != 0) {
 		ddo_total->ddo_dspace /= ddo_total->ddo_count;
 		ddo_total->ddo_mspace /= ddo_total->ddo_count;
 	}
 }
+
+uint64_t
+ddt_get_ddt_dsize(spa_t *spa)
+{
+	ddt_object_t ddo_total;
+
+	if (spa->spa_dedup_table_size == ~0ULL)
+		ddt_get_dedup_object_stats(spa, &ddo_total);
+
+	return (spa->spa_dedup_table_size);
+}
+
 
 void
 ddt_get_dedup_histogram(spa_t *spa, ddt_histogram_t *ddh)
@@ -669,7 +684,7 @@ ddt_remove(ddt_t *ddt, ddt_entry_t *dde)
 ddt_entry_t *
 ddt_lookup(ddt_t *ddt, const blkptr_t *bp, boolean_t add)
 {
-	ddt_entry_t *dde, dde_search;
+	ddt_entry_t *dde, dde_search, *dde_temp;
 	enum ddt_type type;
 	enum ddt_class class;
 	avl_index_t where;
@@ -680,18 +695,17 @@ ddt_lookup(ddt_t *ddt, const blkptr_t *bp, boolean_t add)
 	ddt_key_fill(&dde_search.dde_key, bp);
 
 	dde = avl_find(&ddt->ddt_tree, &dde_search, &where);
-	if (dde == NULL) {
-		if (!add)
-			return (NULL);
+	if (dde) {
+		while (dde->dde_loading)
+			cv_wait(&dde->dde_cv, &ddt->ddt_lock);
+	} else {
 		dde = ddt_alloc(&dde_search.dde_key);
 		avl_insert(&ddt->ddt_tree, dde, where);
 	}
 
-	while (dde->dde_loading)
-		cv_wait(&dde->dde_cv, &ddt->ddt_lock);
-
-	if (dde->dde_loaded)
+	if (dde->dde_loaded) {
 		return (dde);
+	}
 
 	dde->dde_loading = B_TRUE;
 
@@ -713,6 +727,23 @@ ddt_lookup(ddt_t *ddt, const blkptr_t *bp, boolean_t add)
 
 	ddt_enter(ddt);
 
+	/*
+	 * Because the ddt is unlocked during the above loop, there's
+	 * a chance that ddt_sync_table() could be called, which would
+	 * empty out the AVL tree. So let's see if it's still in the
+	 * tree, and if not, clean up after ourselves.  (Which we
+	 * also do if the entry wasn't found in the above loop, and
+	 * we're not supposed to add it at this point.)
+	 */
+	dde_temp = avl_find(&ddt->ddt_tree, &dde_search, &where);
+	if ((dde_temp == NULL) || (error == ENOENT && add == B_FALSE)) {
+		if (dde_temp != NULL)
+			avl_remove(&ddt->ddt_tree, dde);
+		dde->dde_loading = B_FALSE;
+		ddt_free(dde);
+		return (NULL);
+	}
+
 	ASSERT(dde->dde_loaded == B_FALSE);
 	ASSERT(dde->dde_loading == B_TRUE);
 
@@ -721,7 +752,11 @@ ddt_lookup(ddt_t *ddt, const blkptr_t *bp, boolean_t add)
 	dde->dde_loaded = B_TRUE;
 	dde->dde_loading = B_FALSE;
 
-	if (error == 0)
+	/*
+	 * If we found it, but we didn't want to add it, we don't
+	 * need to update the stats yet.
+	 */
+	if (error == 0 && add == B_TRUE)
 		ddt_stat_update(ddt, dde, -1ULL);
 
 	cv_broadcast(&dde->dde_cv);
@@ -850,8 +885,11 @@ ddt_load(spa_t *spa)
 		 */
 		bcopy(ddt->ddt_histogram, &ddt->ddt_histogram_cache,
 		    sizeof (ddt->ddt_histogram));
-		spa->spa_dedup_dspace = ~0ULL;
 	}
+	spa->spa_dedup_dspace = ~0ULL;
+	spa->spa_dedup_table_size = ~0ULL;
+	spa->spa_dedup_table_count = ~0ULL;
+	spa->spa_ddt_pending = 0;
 
 	return (0);
 }
@@ -1112,6 +1150,9 @@ ddt_sync_table(ddt_t *ddt, dmu_tx_t *tx, uint64_t txg)
 	bcopy(ddt->ddt_histogram, &ddt->ddt_histogram_cache,
 	    sizeof (ddt->ddt_histogram));
 	spa->spa_dedup_dspace = ~0ULL;
+	spa->spa_dedup_table_size = ~0ULL;
+	spa->spa_dedup_table_count = ~0ULL;
+	spa->spa_ddt_pending = 0;
 }
 
 void
@@ -1179,6 +1220,71 @@ ddt_walk(spa_t *spa, ddt_bookmark_t *ddb, ddt_entry_t *dde)
 	} while (++ddb->ddb_class < DDT_CLASSES);
 
 	return (SET_ERROR(ENOENT));
+}
+
+static size_t
+ddt_entry_size(spa_t *spa)
+{
+	/*
+	 * This may be over-complicated:  some experimentation
+	 * gave me a size of *just* under 500 bytes for an on-disk
+	 * DDT (ZAP) entry, for a non-trivial DDT, so I round up to 512
+	 * for a default value.  But checking the spa for the
+	 * average size (with some bounds checks) may not be all
+	 * that beneficial over just the plain size.
+	 * (For DDT-ZAP, it's ~390 bytes, plus overhead for the zap,
+	 * which depends on the size and distribution of the entries.
+	 * 480 might be a better estimate than 512, but the quota check
+	 * is done with enough asynchronicity that it will never be
+	 * exact.  So this is aiming for an approximation that will
+	 * be good enough in most cases.)
+	 */
+	static const size_t default_size = 512;
+
+	uint64_t avg;
+	if (spa->spa_dedup_table_count == 0 ||
+	    spa->spa_dedup_table_size == 0 ||
+	    spa->spa_dedup_table_count == ~0ULL ||
+	    spa->spa_dedup_table_size == ~0ULL)
+		return (default_size);
+	avg = spa->spa_dedup_table_size / spa->spa_dedup_table_count;
+	if (avg == 0)
+		return (default_size);
+	return (MIN(default_size, avg));
+}
+
+/*
+ * Check the DDT quota (if one exists)
+ *
+ * The ideal way to do this would be to check the disk size; that
+ * is certainly the intent.  But the DDT implementation may make
+ * that implausible; in particular, the ZAP implementation doesn't
+ * shrink the ZAP immediately, resulting in the disk space for the
+ * larger number of entries still being used depite having very few
+ * entries left.
+ *
+ * So instead, if there's no quota, or if the disk size is less than
+ * the quota, we can grow the DDT; failing that, we look at the amount of
+ * pending additions, and the current count of entries, and multiply that
+ * by the result from ddt_entry_size(), a size bounded estimate of the
+ * average entry size, giving us an approximate size of the table after the
+ * next ddt_sync(); if this will not exceed the quota, continue to allow the
+ * DDT to grow.
+ *
+ */
+boolean_t
+ddt_check_overquota(spa_t *spa)
+{
+	uint64_t estimated_size;
+
+	if (spa->spa_dedup_table_quota == 0 ||
+	    spa->spa_dedup_table_quota >= spa->spa_dedup_table_size)
+		return (B_FALSE);
+	estimated_size = (spa->spa_ddt_pending + spa->spa_dedup_table_count);
+	estimated_size *= ddt_entry_size(spa);
+	if (estimated_size > spa->spa_dedup_table_quota)
+		return (B_TRUE);
+	return (B_FALSE);
 }
 
 /* BEGIN CSTYLED */
