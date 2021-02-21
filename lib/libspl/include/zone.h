@@ -33,7 +33,13 @@
 extern "C" {
 #endif
 
-#define	GLOBAL_ZONEID		0
+/*
+ * Hardcoded in the kernel's root user namespace.  A "better" way to get
+ * this would be by using ioctl_ns(2), but this would need to be performed
+ * recursively on NS_GET_PARENT and then NS_GET_USERNS.  Also, that's only
+ * supported since Linux 4.9.
+ */
+#define	GLOBAL_ZONEID	4026531837U
 
 extern zoneid_t		getzoneid(void);
 

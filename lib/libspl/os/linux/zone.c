@@ -23,10 +23,49 @@
  * Use is subject to license terms.
  */
 
+#include <unistd.h>
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <limits.h>
+#include <string.h>
+
 #include <zone.h>
 
 zoneid_t
 getzoneid()
 {
-	return (GLOBAL_ZONEID);
+	zoneid_t z = 0;
+	char path[PATH_MAX];
+	char buf[128] = { '\0' };
+	char *cp, *cp_end;
+	unsigned long n;
+	int c;
+	ssize_t r;
+
+	c = snprintf(path, sizeof (path), "/proc/%d/ns/user", getpid());
+	/* This API doesn't have any error checking... */
+	if ((size_t)c >= sizeof (path))
+		goto out;
+
+	r = readlink(path, buf, sizeof (buf) - 1);
+	if ((size_t)r >= sizeof (buf))
+		goto out;
+
+	cp = strchr(buf, '[');
+	if (cp == NULL)
+		goto out;
+	cp++;
+	cp_end = strchr(cp, ']');
+	if (cp_end == NULL)
+		goto out;
+
+	*cp_end = '\0';
+	n = strtoul(cp, NULL, 10);
+	if (errno == ERANGE)
+		goto out;
+	z = (zoneid_t)n;
+
+out:
+	return (z);
 }

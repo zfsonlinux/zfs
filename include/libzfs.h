@@ -960,6 +960,15 @@ _LIBZFS_H int zpool_nextboot(libzfs_handle_t *, uint64_t, uint64_t,
 
 #endif /* __FreeBSD__ */
 
+#ifdef __linux__
+
+/*
+ * Add or delete the given filesystem to/from the given user namespace.
+ */
+_LIBZFS_H int zfs_userns(zfs_handle_t *zhp, unsigned int nsnum, int attach);
+
+#endif
+
 #ifdef	__cplusplus
 }
 #endif

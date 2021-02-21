@@ -165,7 +165,7 @@ tests = ['upgrade_projectquota_001_pos']
 tags = ['functional', 'upgrade']
 
 [tests/functional/user_namespace:Linux]
-tests = ['user_namespace_001']
+tests = ['user_namespace_001', 'user_namespace_002']
 tags = ['functional', 'user_namespace']
 
 [tests/functional/userquota:Linux]

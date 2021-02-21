@@ -127,6 +127,10 @@ static int zfs_do_jail(int argc, char **argv);
 static int zfs_do_unjail(int argc, char **argv);
 #endif
 
+#ifdef __linux__
+static int zfs_do_userns(int argc, char **argv);
+#endif
+
 /*
  * Enable a reasonable set of defaults for libumem debugging on DEBUG builds.
  */
@@ -184,6 +188,7 @@ typedef enum {
 	HELP_JAIL,
 	HELP_UNJAIL,
 	HELP_WAIT,
+	HELP_USERNS,
 } zfs_help_t;
 
 typedef struct zfs_command {
@@ -253,6 +258,10 @@ static zfs_command_t command_table[] = {
 #ifdef __FreeBSD__
 	{ "jail",	zfs_do_jail,		HELP_JAIL		},
 	{ "unjail",	zfs_do_unjail,		HELP_UNJAIL		},
+#endif
+
+#ifdef __linux__
+	{ "userns",	zfs_do_userns,		HELP_USERNS		},
 #endif
 };
 
@@ -414,6 +423,8 @@ get_usage(zfs_help_t idx)
 		return (gettext("\tunjail <jailid|jailname> <filesystem>\n"));
 	case HELP_WAIT:
 		return (gettext("\twait [-t <activity>] <filesystem>\n"));
+	case HELP_USERNS:
+		return (gettext("\tuserns <add|del> <nsnum> <filesystem>\n"));
 	}
 
 	abort();
@@ -8728,6 +8739,55 @@ main(int argc, char **argv)
 
 	return (ret);
 }
+
+/*
+ * zfs userns add|del nsnum filesystem
+ *
+ * Add or delete the given dataset to/from the namespace.
+ */
+#ifdef __linux__
+static int
+zfs_do_userns(int argc, char **argv)
+{
+	zfs_handle_t *zhp;
+	unsigned long nsnum;
+	int ret;
+	int attach;
+
+	if (argc < 4) {
+		(void) fprintf(stderr, gettext("missing argument(s)\n"));
+		usage(B_FALSE);
+	}
+	if (argc > 4) {
+		(void) fprintf(stderr, gettext("too many arguments\n"));
+		usage(B_FALSE);
+	}
+
+	if (strcmp(argv[1], "add") == 0) {
+		attach = 1;
+	} else if (strcmp(argv[1], "del") == 0) {
+		attach = 0;
+	} else {
+		(void) fprintf(stderr, gettext("invalid subcommand\n"));
+		usage(B_FALSE);
+	}
+
+	nsnum = strtoul(argv[2], NULL, 10);
+	if (nsnum > UINT_MAX) {
+		(void) fprintf(stderr, gettext("invalid namespace number\n"));
+		usage(B_FALSE);
+	}
+
+	zhp = zfs_open(g_zfs, argv[3], ZFS_TYPE_FILESYSTEM);
+	if (zhp == NULL)
+		return (1);
+
+	ret = (zfs_userns(zhp, (unsigned int)nsnum, attach) != 0);
+
+	zfs_close(zhp);
+	return (ret);
+}
+#endif
 
 #ifdef __FreeBSD__
 #include <sys/jail.h>
