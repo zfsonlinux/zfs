@@ -28,6 +28,7 @@ $(MODULE)-objs += dbuf_stats.o
 $(MODULE)-objs += ddt.o
 $(MODULE)-objs += ddt_zap.o
 $(MODULE)-objs += dmu.o
+$(MODULE)-objs += dmu_direct.o
 $(MODULE)-objs += dmu_diff.o
 $(MODULE)-objs += dmu_object.o
 $(MODULE)-objs += dmu_objset.o

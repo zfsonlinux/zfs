@@ -97,14 +97,6 @@
 
 VFS_SMR_DECLARE;
 
-#if __FreeBSD_version >= 1300047
-#define	vm_page_wire_lock(pp)
-#define	vm_page_wire_unlock(pp)
-#else
-#define	vm_page_wire_lock(pp) vm_page_lock(pp)
-#define	vm_page_wire_unlock(pp) vm_page_unlock(pp)
-#endif
-
 #ifdef DEBUG_VFS_LOCKS
 #define	VNCHECKREF(vp)				  \
 	VNASSERT((vp)->v_holdcnt > 0 && (vp)->v_usecount > 0, vp,	\
@@ -443,19 +435,6 @@ page_hold(vnode_t *vp, int64_t start)
 	return (pp);
 }
 #endif
-
-static void
-page_unhold(vm_page_t pp)
-{
-
-	vm_page_wire_lock(pp);
-#if __FreeBSD_version >= 1300035
-	vm_page_unwire(pp, PQ_ACTIVE);
-#else
-	vm_page_unhold(pp);
-#endif
-	vm_page_wire_unlock(pp);
-}
 
 /*
  * When a file is memory mapped, we must keep the IO data synchronized
@@ -4397,6 +4376,8 @@ ioflags(int ioflags)
 		flags |= FAPPEND;
 	if (ioflags & IO_NDELAY)
 		flags |= FNONBLOCK;
+	if (ioflags & IO_DIRECT)
+		flags |= O_DIRECT;
 	if (ioflags & IO_SYNC)
 		flags |= (FSYNC | FDSYNC | FRSYNC);
 
@@ -4416,9 +4397,13 @@ static int
 zfs_freebsd_read(struct vop_read_args *ap)
 {
 	zfs_uio_t uio;
+	int error;
+	znode_t *zp = VTOZ(ap->a_vp);
+
 	zfs_uio_init(&uio, ap->a_uio);
-	return (zfs_read(VTOZ(ap->a_vp), &uio, ioflags(ap->a_ioflag),
-	    ap->a_cred));
+	error = zfs_read(zp, &uio, ioflags(ap->a_ioflag), ap->a_cred);
+
+	return (error);
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -4434,9 +4419,13 @@ static int
 zfs_freebsd_write(struct vop_write_args *ap)
 {
 	zfs_uio_t uio;
+	int error;
+	znode_t *zp = VTOZ(ap->a_vp);
+
 	zfs_uio_init(&uio, ap->a_uio);
-	return (zfs_write(VTOZ(ap->a_vp), &uio, ioflags(ap->a_ioflag),
-	    ap->a_cred));
+	error = zfs_write(zp, &uio, ioflags(ap->a_ioflag), ap->a_cred);
+
+	return (error);
 }
 
 #if __FreeBSD_version >= 1300102
