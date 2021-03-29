@@ -977,7 +977,8 @@ vdev_expand_proplist(zpool_handle_t *zhp, const char *vdevname,
 			propname = nvpair_name(elem);
 
 			/* Skip properties that are not user defined */
-			if ((prop = vdev_name_to_prop(propname)) != ZPROP_INVAL)
+			if ((prop = vdev_name_to_prop(propname)) !=
+			    (vdev_prop_t)ZPROP_INVAL)
 				continue;
 
 			if (nvpair_value_nvlist(elem, &propval) != 0)

@@ -85,7 +85,8 @@ zfs_mod_supported_prop(const char *name, zfs_type_t type)
 	return (B_TRUE);
 #else
 	return (zfs_mod_supported(type == ZFS_TYPE_POOL ?
-	    ZFS_SYSFS_POOL_PROPERTIES : ZFS_SYSFS_DATASET_PROPERTIES, name));
+	    ZFS_SYSFS_POOL_PROPERTIES : (type == ZFS_TYPE_VDEV ?
+	    ZFS_SYSFS_VDEV_PROPERTIES : ZFS_SYSFS_DATASET_PROPERTIES), name));
 #endif
 }
 

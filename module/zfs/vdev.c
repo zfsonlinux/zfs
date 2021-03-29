@@ -5351,26 +5351,19 @@ vdev_xlate_walk(vdev_t *vd, const range_seg64_t *logical_rs,
 }
 
 static char *
-vdev_name(vdev_t *vd)
+vdev_name(vdev_t *vd, char *buf, int buflen)
 {
-	char *ret;
-
-	ret = vd->vdev_path;
-	if (ret == NULL) {
+	if (vd->vdev_path == NULL) {
 		if (strcmp(vd->vdev_ops->vdev_op_type, "root") == 0) {
-			ret = vd->vdev_spa->spa_name;
+			return (vd->vdev_spa->spa_name);
 		} else if (!vd->vdev_ops->vdev_op_leaf) {
-			char namestr[64] = { 0 };
-
-			snprintf((char *)&namestr,
-			    sizeof (namestr), "%s-%llu",
+			snprintf(buf, buflen, "%s-%llu",
 			    vd->vdev_ops->vdev_op_type,
 			    (u_longlong_t)vd->vdev_id);
-			ret = (char *)&namestr;
+			return (buf);
 		}
 	}
-
-	return (ret);
+	return (vd->vdev_path);
 }
 
 /*
@@ -5638,6 +5631,8 @@ vdev_prop_get(vdev_t *vd, nvlist_t *innvl, nvlist_t *outnvl)
 	mutex_enter(&spa->spa_props_lock);
 
 	if (nvprops != NULL) {
+		char namebuf[64] = { 0 };
+
 		while ((elem = nvlist_next_nvpair(nvprops, elem)) != NULL) {
 			intval = 0;
 			strval = NULL;
@@ -5648,7 +5643,7 @@ vdev_prop_get(vdev_t *vd, nvlist_t *innvl, nvlist_t *outnvl)
 			switch (prop) {
 			/* Special Read-only Properties */
 			case VDEV_PROP_NAME:
-				strval = vdev_name(vd);
+				strval = vdev_name(vd, namebuf, 64);
 				if (strval == NULL)
 					continue;
 				vdev_prop_add_list(outnvl, propname, strval, 0,
@@ -5740,7 +5735,8 @@ vdev_prop_get(vdev_t *vd, nvlist_t *innvl, nvlist_t *outnvl)
 				continue;
 			case VDEV_PROP_PARENT:
 				if (vd->vdev_parent != NULL) {
-					strval = vdev_name(vd->vdev_parent);
+					strval = vdev_name(vd->vdev_parent,
+					    namebuf, 64);
 					vdev_prop_add_list(outnvl, propname,
 					    strval, 0, ZPROP_SRC_NONE);
 				}
@@ -5753,7 +5749,8 @@ vdev_prop_get(vdev_t *vd, nvlist_t *innvl, nvlist_t *outnvl)
 				    i++) {
 					char *vname;
 
-					vname = vdev_name(vd->vdev_child[i]);
+					vname = vdev_name(vd->vdev_child[i],
+					    namebuf, 64);
 					if (vname == NULL)
 						vname = "(unknown)";
 					if (strlen(strval) > 0)
