@@ -672,6 +672,10 @@ zfs_unmount(zfs_handle_t *zhp, const char *mountpoint, int flags)
 		}
 	}
 
+#ifdef __APPLE__
+	zpool_disable_volume(zhp->zfs_name);
+#endif
+
 	return (0);
 }
 
@@ -1636,6 +1640,11 @@ zpool_disable_datasets(zpool_handle_t *zhp, boolean_t force)
 		if (sets[i].dataset)
 			remove_mountpoint(sets[i].dataset);
 	}
+
+#ifdef __APPLE__
+	/* We have to do a bunch of work to kick ZVOLs off */
+	zpool_disable_datasets_os(zhp, force);
+#endif
 
 	ret = 0;
 out:

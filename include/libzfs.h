@@ -839,7 +839,7 @@ _LIBZFS_H int zfs_unmount(zfs_handle_t *, const char *, int);
 _LIBZFS_H int zfs_unmountall(zfs_handle_t *, int);
 _LIBZFS_H int zfs_mount_delegation_check(void);
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
 _LIBZFS_H int zfs_parse_mount_options(char *mntopts, unsigned long *mntflags,
     unsigned long *zfsflags, int sloppy, char *badopt, char *mtabopt);
 _LIBZFS_H void zfs_adjust_mount_options(zfs_handle_t *zhp, const char *mntpoint,
@@ -930,6 +930,9 @@ _LIBZFS_H int zfs_smb_acl_rename(libzfs_handle_t *, char *, char *, char *,
  */
 _LIBZFS_H int zpool_enable_datasets(zpool_handle_t *, const char *, int);
 _LIBZFS_H int zpool_disable_datasets(zpool_handle_t *, boolean_t);
+_LIBZFS_H void zpool_disable_datasets_os(zpool_handle_t *zhp, boolean_t force);
+_LIBZFS_H void zpool_disable_volume(const char *);
+_LIBZFS_H void zfs_rollback_os(struct zfs_handle *);
 
 /*
  * Parse a features file for -o compatibility
@@ -963,8 +966,19 @@ _LIBZFS_H int zpool_nextboot(libzfs_handle_t *, uint64_t, uint64_t,
 /*
  * Manual mounting of snapshots.
  */
-extern int zfs_snapshot_mount(zfs_handle_t *, const char *, int);
-extern int zfs_snapshot_unmount(zfs_handle_t *, int);
+_LIBZFS_H int zfs_snapshot_mount(zfs_handle_t *, const char *, int);
+_LIBZFS_H int zfs_snapshot_unmount(zfs_handle_t *, int);
+
+#ifdef __APPLE__
+/* Used by mount_zfs */
+_LIBZFS_H int getmntany(FILE *fd, struct mnttab *mgetp, struct mnttab *mrefp);
+_LIBZFS_H int getmntent(FILE *fp, struct mnttab *mp);
+_LIBZFS_H char *hasmntopt(struct mnttab *mnt, char *opt);
+_LIBZFS_H int getextmntent(const char *path, struct extmnttab *entry,
+	struct stat64 *statbuf);
+_LIBZFS_H int do_mount(zfs_handle_t *zhp, const char *dir, char *optptr,
+    int mflag);
+#endif
 
 #ifdef	__cplusplus
 }
