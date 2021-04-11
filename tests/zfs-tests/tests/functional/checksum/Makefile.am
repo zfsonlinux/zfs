@@ -9,6 +9,7 @@ pkgdatadir = $(datadir)/@PACKAGE@/zfs-tests/tests/functional/checksum
 dist_pkgdata_SCRIPTS = \
 	setup.ksh \
 	cleanup.ksh \
+	run_blake3_test.ksh \
 	run_edonr_test.ksh \
 	run_sha2_test.ksh \
 	run_skein_test.ksh \
@@ -21,9 +22,11 @@ dist_pkgdata_DATA = \
 pkgexecdir = $(datadir)/@PACKAGE@/zfs-tests/tests/functional/checksum
 
 pkgexec_PROGRAMS = \
+	blake3_test \
 	skein_test \
 	sha2_test
 
+blake3_test_SOURCES = blake3_test.c
 skein_test_SOURCES = skein_test.c
 sha2_test_SOURCES = sha2_test.c
 

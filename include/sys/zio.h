@@ -91,6 +91,7 @@ enum zio_checksum {
 #if !defined(__FreeBSD__)
 	ZIO_CHECKSUM_EDONR,
 #endif
+	ZIO_CHECKSUM_BLAKE3,
 	ZIO_CHECKSUM_FUNCTIONS
 };
 

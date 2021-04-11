@@ -26,6 +26,11 @@ AC_DEFUN([ZFS_AC_CONFIG_ALWAYS_TOOLCHAIN_SIMD], [
 			ZFS_AC_CONFIG_TOOLCHAIN_CAN_BUILD_MOVBE
 			;;
 	esac
+	case "$host_cpu" in
+		aarch64)
+			ZFS_AC_CONFIG_TOOLCHAIN_CAN_BUILD_ARM_NEON
+			;;
+	esac
 ])
 
 dnl #
@@ -418,6 +423,26 @@ AC_DEFUN([ZFS_AC_CONFIG_TOOLCHAIN_CAN_BUILD_MOVBE], [
 	]])], [
 		AC_MSG_RESULT([yes])
 		AC_DEFINE([HAVE_MOVBE], 1, [Define if host toolchain supports MOVBE])
+	], [
+		AC_MSG_RESULT([no])
+	])
+])
+
+dnl #
+dnl # ZFS_AC_CONFIG_TOOLCHAIN_CAN_BUILD_ARM_NEON
+dnl #
+AC_DEFUN([ZFS_AC_CONFIG_TOOLCHAIN_CAN_BUILD_ARM_NEON], [
+	AC_MSG_CHECKING([whether host toolchain supports NEON])
+
+	AC_LINK_IFELSE([AC_LANG_SOURCE([[
+		include <arm_neon.h>
+		void main()
+		{
+			return;
+		}
+	]])], [
+		AC_DEFINE([HAVE_ARM_NEON_H], 1, [Define if host toolchain supports NEON])
+		AC_MSG_RESULT([yes])
 	], [
 		AC_MSG_RESULT([no])
 	])

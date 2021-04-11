@@ -87,6 +87,7 @@ zfs_prop_init(void)
 
 		{ "edonr",	ZIO_CHECKSUM_EDONR },
 #endif
+		{ "blake3",	ZIO_CHECKSUM_BLAKE3 },
 		{ NULL }
 	};
 
@@ -108,6 +109,9 @@ zfs_prop_init(void)
 		{ "edonr,verify",
 				ZIO_CHECKSUM_EDONR | ZIO_CHECKSUM_VERIFY },
 #endif
+		{ "blake3",	ZIO_CHECKSUM_BLAKE3 },
+		{ "blake3,verify",
+				ZIO_CHECKSUM_BLAKE3 | ZIO_CHECKSUM_VERIFY },
 		{ NULL }
 	};
 
@@ -398,18 +402,19 @@ zfs_prop_init(void)
 	    ZFS_TYPE_VOLUME,
 #if !defined(__FreeBSD__)
 	    "on | off | fletcher2 | fletcher4 | sha256 | sha512 | skein"
-	    " | edonr",
+	    " | edonr | blake3",
 #else
-	    "on | off | fletcher2 | fletcher4 | sha256 | sha512 | skein",
+	    "on | off | fletcher2 | fletcher4 | sha256 | sha512 | skein"
+	    " | blake3",
 #endif
 	    "CHECKSUM", checksum_table);
 	zprop_register_index(ZFS_PROP_DEDUP, "dedup", ZIO_CHECKSUM_OFF,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
 	    "on | off | verify | sha256[,verify] | sha512[,verify] | "
 #if !defined(__FreeBSD__)
-	    "skein[,verify] | edonr,verify",
+	    "skein[,verify] | edonr,verify | blake3[,verify]",
 #else
-	    "skein[,verify]",
+	    "skein[,verify] | blake3[,verify]",
 #endif
 	    "DEDUP", dedup_table);
 	zprop_register_index(ZFS_PROP_COMPRESSION, "compression",
