@@ -1119,9 +1119,10 @@ error:
  * and le_bswap indicates whether a byteswap is needed to get this block
  * into little endian format.
  */
-int
-zio_crypt_do_objset_hmacs(zio_crypt_key_t *key, void *data, uint_t datalen,
-    boolean_t should_bswap, uint8_t *portable_mac, uint8_t *local_mac)
+static int
+zio_crypt_do_objset_hmacs_impl(zio_crypt_key_t *key, void *data,
+    uint_t datalen, boolean_t should_bswap, uint8_t *portable_mac,
+    uint8_t *local_mac, boolean_t skip_projectquota)
 {
 	int ret;
 	crypto_mechanism_t mech;
@@ -1266,12 +1267,20 @@ zio_crypt_do_objset_hmacs(zio_crypt_key_t *key, void *data, uint_t datalen,
 			goto error;
 	}
 
-	if (osp->os_projectused_dnode.dn_type != DMU_OT_NONE &&
-	    datalen >= OBJSET_PHYS_SIZE_V3) {
-		ret = zio_crypt_do_dnode_hmac_updates(ctx, key->zk_version,
-		    should_bswap, &osp->os_projectused_dnode);
-		if (ret)
-			goto error;
+	/*
+	 * Unfortunate side-effect of macOS port getting crypto before
+	 * projectquota. Luckily, if we just let it mount, by generating the
+	 * old style local_mac, "generate" calls will upgrade to "proper".
+	 */
+	if (!skip_projectquota) {
+		if (osp->os_projectused_dnode.dn_type != DMU_OT_NONE &&
+		    datalen >= OBJSET_PHYS_SIZE_V3) {
+			ret = zio_crypt_do_dnode_hmac_updates(ctx,
+			    key->zk_version, should_bswap,
+			    &osp->os_projectused_dnode);
+			if (ret)
+				goto error;
+		}
 	}
 
 	/* store the final digest in a temporary buffer and copy what we need */
@@ -1293,6 +1302,24 @@ error:
 	bzero(portable_mac, ZIO_OBJSET_MAC_LEN);
 	bzero(local_mac, ZIO_OBJSET_MAC_LEN);
 	return (ret);
+}
+
+int
+zio_crypt_do_objset_hmacs(zio_crypt_key_t *key, void *data, uint_t datalen,
+    boolean_t should_bswap, uint8_t *portable_mac, uint8_t *local_mac)
+{
+	return (zio_crypt_do_objset_hmacs_impl(key, data, datalen, should_bswap,
+	    portable_mac, local_mac, FALSE));
+}
+
+int
+zio_crypt_do_objset_hmacs_errata1(zio_crypt_key_t *key, void *data,
+    uint_t datalen, boolean_t should_bswap, uint8_t *portable_mac,
+    uint8_t *local_mac)
+{
+	dprintf("trying errata1 work-around\n");
+	return (zio_crypt_do_objset_hmacs_impl(key, data, datalen, should_bswap,
+	    portable_mac, local_mac, TRUE));
 }
 
 static void

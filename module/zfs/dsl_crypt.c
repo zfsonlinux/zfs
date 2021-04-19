@@ -2701,6 +2701,18 @@ spa_do_crypt_objset_mac_abd(boolean_t generate, spa_t *spa, uint64_t dsobj,
 		return (0);
 	}
 
+#ifdef __APPLE__
+	/*
+	 * Unfortunate errata case, see module/os/macos/zfs/zio_crypt.c
+	 * If portable is GOOD, but local_mac is BAD - recompute
+	 */
+	if (bcmp(portable_mac, osp->os_portable_mac, ZIO_OBJSET_MAC_LEN) == 0 &&
+	    bcmp(local_mac, osp->os_local_mac, ZIO_OBJSET_MAC_LEN) != 0) {
+		ret = zio_crypt_do_objset_hmacs_errata1(&dck->dck_key, buf,
+		    datalen, byteswap, portable_mac, local_mac);
+	}
+#endif
+
 	if (bcmp(portable_mac, osp->os_portable_mac, ZIO_OBJSET_MAC_LEN) != 0 ||
 	    bcmp(local_mac, osp->os_local_mac, ZIO_OBJSET_MAC_LEN) != 0) {
 		abd_return_buf(abd, buf, datalen);
