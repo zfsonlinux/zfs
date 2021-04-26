@@ -2431,6 +2431,12 @@ print_status_config(zpool_handle_t *zhp, status_cbdata_t *cb, const char *name,
 		    1 << vs->vs_configured_ashift, 1 << vs->vs_physical_ashift);
 	}
 
+	if (vs->vs_scan_removing != 0) {
+		(void) printf(gettext("  (removing)"));
+	} else if (vs->vs_noalloc != 0) {
+		(void) printf(gettext("  (non-allocating)"));
+	}
+
 	/* The root vdev has the scrub/resilver stats */
 	root = fnvlist_lookup_nvlist(zpool_get_config(zhp, NULL),
 	    ZPOOL_CONFIG_VDEV_TREE);
@@ -10202,6 +10208,14 @@ set_callback(zpool_handle_t *zhp, void *data)
 	int error;
 	set_cbdata_t *cb = (set_cbdata_t *)data;
 
+	if (cb->cb_type == ZFS_TYPE_VDEV) {
+		error = zpool_set_vdev_prop(zhp, *cb->cb_vdevs.cb_names,
+		    cb->cb_propname, cb->cb_value);
+		if (!error)
+			cb->cb_any_successful = B_TRUE;
+		return (error);
+	}
+
 	/* Check if we have out-of-bounds features */
 	if (strcmp(cb->cb_propname, ZPOOL_CONFIG_COMPATIBILITY) == 0) {
 		boolean_t features[SPA_FEATURES];
@@ -10259,11 +10273,7 @@ set_callback(zpool_handle_t *zhp, void *data)
 		}
 	}
 
-	if (cb->cb_type == ZFS_TYPE_VDEV)
-		error = zpool_set_vdev_prop(zhp, *cb->cb_vdevs.cb_names,
-		    cb->cb_propname, cb->cb_value);
-	else
-		error = zpool_set_prop(zhp, cb->cb_propname, cb->cb_value);
+	error = zpool_set_prop(zhp, cb->cb_propname, cb->cb_value);
 
 	if (!error)
 		cb->cb_any_successful = B_TRUE;

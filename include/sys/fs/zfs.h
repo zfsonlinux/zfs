@@ -773,6 +773,7 @@ typedef struct zpool_load_policy {
 #define	ZPOOL_CONFIG_ORIG_GUID		"orig_guid"
 #define	ZPOOL_CONFIG_SPLIT_GUID		"split_guid"
 #define	ZPOOL_CONFIG_SPLIT_LIST		"guid_list"
+#define	ZPOOL_CONFIG_NONALLOCATING	"non_allocating"
 #define	ZPOOL_CONFIG_REMOVING		"removing"
 #define	ZPOOL_CONFIG_RESILVER_TXG	"resilver_txg"
 #define	ZPOOL_CONFIG_REBUILD_TXG	"rebuild_txg"
@@ -1150,6 +1151,7 @@ typedef struct vdev_stat {
 	uint64_t	vs_checksum_errors;	/* checksum errors	*/
 	uint64_t	vs_initialize_errors;	/* initializing errors	*/
 	uint64_t	vs_self_healed;		/* self-healed bytes	*/
+	uint64_t	vs_noalloc;		/* allocations halted?	*/
 	uint64_t	vs_scan_removing;	/* removing?	*/
 	uint64_t	vs_scan_processed;	/* scan processed bytes	*/
 	uint64_t	vs_fragmentation;	/* device fragmentation */
