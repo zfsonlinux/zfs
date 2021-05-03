@@ -1217,6 +1217,12 @@ zpool_find_import_scan_add_slice(libpc_handle_t *hdl, pthread_mutex_t *lock,
 	slice->rn_lock = lock;
 	slice->rn_avl = cache;
 	slice->rn_hdl = hdl;
+#ifdef __APPLE__
+	/* Prefer diskX over rdiskX: involve os/ somehow? */
+	if (name[0] == 'r')
+		slice->rn_order = order + IMPORT_ORDER_DEFAULT;
+	else
+#endif
 	slice->rn_order = order + IMPORT_ORDER_SCAN_OFFSET;
 	slice->rn_labelpaths = B_FALSE;
 
