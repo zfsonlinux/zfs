@@ -63,8 +63,15 @@ typedef struct zfs_zstd_header {
 	union {
 		uint32_t raw_version_level;
 		struct {
+#ifdef _ZFS_LITTLE_ENDIAN
 			uint32_t version : 24;
 			uint8_t level;
+#else
+#ifdef  _ZFS_BIG_ENDIAN
+			uint8_t level;
+			uint32_t version : 24;
+#endif
+#endif
 		};
 	};
 
