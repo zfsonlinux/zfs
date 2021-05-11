@@ -36,6 +36,31 @@
 
 #define	flock64_t	struct flock
 
+/*
+ * XNU reserves fileID 1-15, so we remap them high.
+ * 2 is root-of-the-mount.
+ * If ID is same as root, return 2. Otherwise, if it is 0-15, return
+ * adjusted, otherwise, return as-is.
+ * See hfs_format.h: kHFSRootFolderID, kHFSExtentsFileID, ...
+ */
+#define	INO_ROOT 		2ULL
+#define	INO_RESERVED		16ULL	/* [0-15] reserved. */
+#define	INO_ISRESERVED(ID)	((ID) < (INO_RESERVED))
+/*				0xFFFFFFFFFFFFFFF0 */
+#define	INO_MAP			((uint64_t)-INO_RESERVED) /* -16, -15, .., -1 */
+
+#define	INO_ZFSTOXNU(ID, ROOT)	\
+	((ID) == (ROOT)?INO_ROOT:(INO_ISRESERVED(ID)?INO_MAP+(ID):(ID)))
+
+/*
+ * This macro relies on *unsigned*.
+ * If asking for 2, return rootID. If in special range, adjust to
+ * normal, otherwise, return as-is.
+ */
+#define	INO_XNUTOZFS(ID, ROOT)	\
+	((ID) == INO_ROOT)?(ROOT): \
+	(INO_ISRESERVED((ID)-INO_MAP))?((ID)-INO_MAP):(ID)
+
 struct spa_iokit;
 typedef struct spa_iokit spa_iokit_t;
 

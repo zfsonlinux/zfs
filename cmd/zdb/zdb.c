@@ -3629,6 +3629,9 @@ parse_object_range(char *range, zopt_object_range_t *zor, char **msg)
 			*msg = "Invalid characters in object ID";
 			rc = 1;
 		}
+#ifdef __APPLE__
+		zor->zor_obj_start = INO_XNUTOZFS(zor->zor_obj_start, 2);
+#endif
 		zor->zor_obj_end = zor->zor_obj_start;
 		return (rc);
 	}
@@ -3706,6 +3709,11 @@ parse_object_range(char *range, zopt_object_range_t *zor, char **msg)
 			flags |= bit;
 	}
 	zor->zor_flags = flags;
+
+#ifdef __APPLE__
+	zor->zor_obj_start = INO_XNUTOZFS(zor->zor_obj_start, 2);
+	zor->zor_obj_end = INO_XNUTOZFS(zor->zor_obj_end, 2);
+#endif
 
 out:
 	free(dup);
