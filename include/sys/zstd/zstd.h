@@ -60,9 +60,9 @@ typedef struct zfs_zstd_header {
 	 * unsigned integer, but still access the individual bitmasked
 	 * components easily.
 	 */
-	union {
+//	union {
 		uint32_t raw_version_level;
-		struct {
+/*		struct {
 #ifdef _ZFS_LITTLE_ENDIAN
 			uint32_t version : 24;
 			uint8_t level;
@@ -74,7 +74,7 @@ typedef struct zfs_zstd_header {
 #endif
 		};
 	};
-
+*/
 	char data[];
 } zfs_zstdhdr_t;
 
