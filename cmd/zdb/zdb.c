@@ -2228,56 +2228,74 @@ blkid2offset(const dnode_phys_t *dnp, const blkptr_t *bp,
 	    (zb->zb_level * (dnp->dn_indblkshift - SPA_BLKPTRSHIFT))) *
 	    dnp->dn_datablkszsec << SPA_MINBLOCKSHIFT);
 }
+
 static uint32_t
-zfs_get_hdrversion(const zfs_zstdhdr_t* blob) {
+zfs_get_hdrversion(const zfs_zstdhdr_t *blob)
+{
+	/*
+	 * So we're searching 4 bytes to figure out where the version
+	 * and level bytes are. The level bytes can cover the whole range
+	 * of uint8_t, and so are not helpful. Fortunately, the version
+	 * field is going to have a leading 00 from now until version
+	 * 6.55.56 or higher with how it's represented, so we can dig
+	 * that out, and know that wherever we found it, the two bytes
+	 * "next" to it in the range are the other version bytes, in order,
+	 * and whichever byte remains is the level field.
+	 */
 	uint32_t version_wip, version_final;
 	uint8_t findme = 0xff;
-	void* wip = (void*)(((uintptr_t)&(blob->raw_version_level)));
+	void *wip = (void*)(((uintptr_t)&(blob->raw_version_level)));
 	version_wip = *((uint32_t *)wip);
 	int shift;
-	for (shift = 0; shift < 4; shift++) { 
+	for (shift = 0; shift < 4; shift++) {
 		findme = ((version_wip >> (8*shift)) & 0x000000FF);
 		if (findme == 0)
 			break;
 	}
-	fprintf(stderr,"normal %d %d\n",findme,shift);
 	switch (shift) {
 		case 0:
-		version_final = (((version_wip << 16) & 0x00FF0000) |
-				 ((version_wip      ) & 0x0000FF00) |
-				 ((version_wip >> 16) & 0x000000FF) );
+		version_final = (
+		    ((version_wip << 16) & 0x00FF0000) |
+		    ((version_wip)	 & 0x0000FF00) |
+		    ((version_wip >> 16) & 0x000000FF));
 		break;
 		case 1:
-		version_final = (((version_wip <<  8) & 0x00FF0000) |
-				 ((version_wip >>  8) & 0x0000FF00) |
-				 ((version_wip >> 16) & 0x000000FF) );
+		version_final = (
+		    ((version_wip <<  8) & 0x00FF0000) |
+		    ((version_wip >>  8) & 0x0000FF00) |
+		    ((version_wip >> 16) & 0x000000FF));
 		break;
 		case 2:
-		version_final = (((version_wip      ) & 0x00FF0000) |
-				 ((version_wip      ) & 0x0000FF00) |
-				 ((version_wip      ) & 0x000000FF) );
+		version_final = (
+		    ((version_wip)	 & 0x00FF0000) |
+		    ((version_wip)	 & 0x0000FF00) |
+		    ((version_wip)	 & 0x000000FF));
 		break;
 		case 3:
-		version_final = (((version_wip >>  8) & 0x00FF0000) |
-				 ((version_wip >>  8) & 0x0000FF00) |
-				 ((version_wip >>  8) & 0x000000FF) );
+		version_final = (
+		    ((version_wip >>  8) & 0x00FF0000) |
+		    ((version_wip >>  8) & 0x0000FF00) |
+		    ((version_wip >>  8) & 0x000000FF));
 		break;
 		default:
-		fprintf(stderr,"on fire %x\n", version_wip);
-		version_final=0;
+		version_final = 0;
 		break;
 	}
-	return version_final;
+	return (version_final);
 }
 
 static uint8_t
-zfs_get_hdrlevel(const zfs_zstdhdr_t* blob) {
+zfs_get_hdrlevel(const zfs_zstdhdr_t *blob)
+{
+	/*
+	 * See comment at the top of zfs_get_hdrversion.
+	 */
 	uint32_t level_wip, level_final;
 	uint8_t findme = 0xff;
-	void* wip = (void*)(((uintptr_t)&(blob->raw_version_level)));
+	void *wip = (void *)(((uintptr_t)&(blob->raw_version_level)));
 	level_wip = *((uint32_t *)wip);
 	int shift;
-	for (shift = 0; shift < 4; shift++) { 
+	for (shift = 0; shift < 4; shift++) {
 		findme = ((level_wip >> (8*shift)) & 0x000000FF);
 		if (findme == 0)
 			break;
@@ -2287,20 +2305,19 @@ zfs_get_hdrlevel(const zfs_zstdhdr_t* blob) {
 		level_final = ((level_wip >> 24) & 0x000000FF);
 		break;
 		case 1:
-		level_final = ((level_wip      ) & 0x000000FF);
+		level_final = ((level_wip)	 & 0x000000FF);
 		break;
 		case 2:
 		level_final = ((level_wip >> 24) & 0x000000FF);
 		break;
 		case 3:
-		level_final = ((level_wip      ) & 0x000000FF);
+		level_final = ((level_wip)	 & 0x000000FF);
 		break;
 		default:
-		fprintf(stderr,"on fire %x\n", level_wip);
-		level_final=0;
+		level_final = 0;
 		break;
 	}
-	return level_final;
+	return (level_final);
 }
 
 static void
@@ -2329,13 +2346,15 @@ snprintf_zstd_header(spa_t *spa, char *blkbuf, size_t buflen,
 		memcpy(&zstd_hdr, buf, sizeof (zstd_hdr));
 		free(buf);
 		zstd_hdr.c_len = BE_32(zstd_hdr.c_len);
-		if (zstd_hdr.c_len > 0x10000000) // 16 MB is probably safe to assume byteswap
+		// 16 MB is probably safe to assume byteswap
+		if (zstd_hdr.c_len > 0x10000000)
 			zstd_hdr.c_len = __builtin_bswap32(zstd_hdr.c_len);
 		zstd_hdr.raw_version_level = BE_32(zstd_hdr.raw_version_level);
 		(void) snprintf(blkbuf + strlen(blkbuf),
 		    buflen - strlen(blkbuf),
 		    " ZSTD:size=%u:version=%u:level=%u:EMBEDDED",
-		    zstd_hdr.c_len, zfs_get_hdrversion(&zstd_hdr), zfs_get_hdrlevel(&zstd_hdr));
+		    zstd_hdr.c_len, zfs_get_hdrversion(&zstd_hdr),
+		    zfs_get_hdrlevel(&zstd_hdr));
 		return;
 	}
 
@@ -2354,14 +2373,16 @@ snprintf_zstd_header(spa_t *spa, char *blkbuf, size_t buflen,
 	buf = abd_borrow_buf_copy(pabd, BP_GET_LSIZE(bp));
 	memcpy(&zstd_hdr, buf, sizeof (zstd_hdr));
 	zstd_hdr.c_len = BE_32(zstd_hdr.c_len);
-	if (zstd_hdr.c_len > 0x10000000) // 16 MB is probably safe to assume byteswap
+	// 16 MB is probably safe to assume byteswap
+	if (zstd_hdr.c_len > 0x10000000)
 		zstd_hdr.c_len = __builtin_bswap32(zstd_hdr.c_len);
 	zstd_hdr.raw_version_level = BE_32(zstd_hdr.raw_version_level);
 
 	(void) snprintf(blkbuf + strlen(blkbuf),
 	    buflen - strlen(blkbuf),
 	    " ZSTD:size=%u:version=%u:level=%u:NORMAL",
-	    zstd_hdr.c_len, zfs_get_hdrversion(&zstd_hdr), zfs_get_hdrlevel(&zstd_hdr));
+	    zstd_hdr.c_len, zfs_get_hdrversion(&zstd_hdr),
+	    zfs_get_hdrlevel(&zstd_hdr));
 
 	abd_return_buf_copy(pabd, buf, BP_GET_LSIZE(bp));
 }

@@ -56,25 +56,13 @@ typedef struct zfs_zstd_header {
 
 	/*
 	 * Version and compression level
-	 * We use a union to be able to big endian encode a single 32 bit
-	 * unsigned integer, but still access the individual bitmasked
-	 * components easily.
+	 * We used to use a union to reference compression level
+	 * and version easily, but as it turns out, relying on the
+	 * ordering of bitfields is not remotely portable.
+	 * So now we have get/set functions in zfs_zstd.c for
+	 * manipulating this in just the right way forever.
 	 */
-//	union {
-		uint32_t raw_version_level;
-/*		struct {
-#ifdef _ZFS_LITTLE_ENDIAN
-			uint32_t version : 24;
-			uint8_t level;
-#else
-#ifdef  _ZFS_BIG_ENDIAN
-			uint8_t level;
-			uint32_t version : 24;
-#endif
-#endif
-		};
-	};
-*/
+	uint32_t raw_version_level;
 	char data[];
 } zfs_zstdhdr_t;
 

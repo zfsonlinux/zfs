@@ -361,67 +361,44 @@ zstd_enum_to_level(enum zio_zstd_levels level, int16_t *zstd_level)
 	return (1);
 }
 
-uint32_t
-zfs_get_hdrversion(const zfs_zstdhdr_t* blob) {
-	uint32_t version_wip, version_final;
-	uint8_t findme = 0xff;
-	void* wip = (void*)(((uintptr_t)&(blob->raw_version_level)));
-	version_wip = *((uint32_t *)wip);
-	int shift;
-	for (shift = 0; shift < 4; shift++) { 
-		findme = ((version_wip >> (8*shift)) & 0x000000FF);
-		if (findme == 0)
-			break;
-	}
-	switch (shift) {
-		case 0:
-		version_final = (((version_wip << 16) & 0x00FF0000) |
-				 ((version_wip      ) & 0x0000FF00) |
-				 ((version_wip >> 16) & 0x000000FF) );
-		break;
-		case 1:
-		version_final = (((version_wip <<  8) & 0x00FF0000) |
-				 ((version_wip >>  8) & 0x0000FF00) |
-				 ((version_wip >> 16) & 0x000000FF) );
-		break;
-		case 2:
-		version_final = (((version_wip      ) & 0x00FF0000) |
-				 ((version_wip      ) & 0x0000FF00) |
-				 ((version_wip      ) & 0x000000FF) );
-		break;
-		case 3:
-		version_final = (((version_wip >>  8) & 0x00FF0000) |
-				 ((version_wip >>  8) & 0x0000FF00) |
-				 ((version_wip >>  8) & 0x000000FF) );
-		break;
-		default:
-		version_final=0;
-		break;
-	}
-	return version_final;
-}
+/*
+ * Since it was never used, it's not here, but if you need it,
+ * a copy of zfs_get_hdrversion can be found in zdb.c
+ */
 
-size_t
-zfs_set_hdrversion(zfs_zstdhdr_t* blob, uint32_t version) {
+static size_t
+zfs_set_hdrversion(zfs_zstdhdr_t *blob, uint32_t version)
+{
 #ifdef _ZFS_LITTLE_ENDIAN
-	uint8_t* dst=(void*)(((uintptr_t)&(blob->raw_version_level)));
+	void *dst = (void *)(((uintptr_t)&(blob->raw_version_level)));
 #else
 #ifdef _ZFS_BIG_ENDIAN
-	uint8_t* dst=(void*)(((uintptr_t)&(blob->raw_version_level))+3);
+	void *dst = (void *)(((uintptr_t)&(blob->raw_version_level))+3);
 #endif
 #endif
-	memcpy(dst,&version,3);
-	return 0;
+	memcpy(dst, &version, 3);
+	return (0);
 }
 
-uint8_t
-zfs_get_hdrlevel(const zfs_zstdhdr_t* blob) {
+static uint8_t
+zfs_get_hdrlevel(const zfs_zstdhdr_t *blob)
+{
+	/*
+	 * So we're searching 4 bytes to figure out where the version
+	 * and level bytes are. The level bytes can cover the whole range
+	 * of uint8_t, and so are not helpful. Fortunately, the version
+	 * field is going to have a leading 00 from now until version
+	 * 6.55.56 or higher with how it's represented, so we can dig
+	 * that out, and know that wherever we found it, the two bytes
+	 * "next" to it in the range are the other version bytes, in order,
+	 * and whichever byte remains is the level field.
+	 */
 	uint32_t level_wip, level_final;
 	uint8_t findme = 0xff;
-	void* wip = (void*)(&(blob->raw_version_level));
+	void *wip = (void *)(((uintptr_t)&(blob->raw_version_level)));
 	level_wip = *((uint32_t *)wip);
 	int shift;
-	for (shift = 0; shift < 4; shift++) { 
+	for (shift = 0; shift < 4; shift++) {
 		findme = ((level_wip >> (8*shift)) & 0x000000FF);
 		if (findme == 0)
 			break;
@@ -431,31 +408,33 @@ zfs_get_hdrlevel(const zfs_zstdhdr_t* blob) {
 		level_final = ((level_wip >> 24) & 0x000000FF);
 		break;
 		case 1:
-		level_final = ((level_wip      ) & 0x000000FF);
+		level_final = ((level_wip)	 & 0x000000FF);
 		break;
 		case 2:
 		level_final = ((level_wip >> 24) & 0x000000FF);
 		break;
 		case 3:
-		level_final = ((level_wip      ) & 0x000000FF);
+		level_final = ((level_wip)	 & 0x000000FF);
 		break;
 		default:
-		level_final=0;
+		level_final = 0;
 		break;
 	}
-	return level_final;
+	return (level_final);
 }
-size_t
-zfs_set_hdrlevel(zfs_zstdhdr_t* blob,uint8_t level) {
+
+static size_t
+zfs_set_hdrlevel(zfs_zstdhdr_t *blob, uint8_t level)
+{
 #ifdef	_ZFS_LITTLE_ENDIAN
-	uint8_t* dst=(((uint8_t*)&(blob->raw_version_level))+3);
+	uint8_t *dst = (((uint8_t *)&(blob->raw_version_level))+3);
 #else
 #ifdef _ZFS_BIG_ENDIAN
-	uint8_t* dst=(((uint8_t*)&(blob->raw_version_level)));
+	uint8_t *dst = (((uint8_t *)&(blob->raw_version_level)));
 #endif
 #endif
-	*dst=level;
-	return 0;
+	*dst = level;
+	return (0);
 }
 
 /* Compress block using zstd */
@@ -555,10 +534,8 @@ zfs_zstd_compress(void *s_start, void *d_start, size_t s_len, size_t d_len,
 	 * As soon as such incompatibility occurs, handling code needs to be
 	 * added, differentiating between the versions.
 	 */
-//	hdr->version = ZSTD_VERSION_NUMBER;
-	zfs_set_hdrversion(hdr,ZSTD_VERSION_NUMBER);
-	zfs_set_hdrlevel(hdr,level);
-//	hdr->level = level;
+	zfs_set_hdrversion(hdr, ZSTD_VERSION_NUMBER);
+	zfs_set_hdrlevel(hdr, level);
 	hdr->raw_version_level = BE_32(hdr->raw_version_level);
 
 	return (c_len + sizeof (*hdr));
@@ -578,15 +555,18 @@ zfs_zstd_decompress_level(void *s_start, void *d_start, size_t s_len,
 
 	hdr = (const zfs_zstdhdr_t *)s_start;
 	c_len = BE_32(hdr->c_len);
-	if (c_len > 0x1000000) // 16 MB is probably a fine threshold
+	/*
+	 * Sometimes, BE systems mangle the c_len, so if we see a c_len
+	 * larger than 16 MB, it's probably safe to assume it got swapped,
+	 * since ZFS balks at blocks that large.
+	 */
+	if (c_len > 0x1000000)
 		c_len = __builtin_bswap32(c_len);
 
 	/*
 	 * Make a copy instead of directly converting the header, since we must
 	 * not modify the original data that may be used again later.
 	 */
-	//zfs_set_hdrversion(&hdr_copy,zfs_get_hdrversion(hdr));
-	//zfs_set_hdrlevel(&hdr_copy,zfs_get_hdrlevel(hdr));
 	hdr_copy.raw_version_level = BE_32(hdr->raw_version_level);
 	uint8_t curlevel = zfs_get_hdrlevel(&hdr_copy);
 
