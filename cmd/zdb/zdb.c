@@ -2346,9 +2346,6 @@ snprintf_zstd_header(spa_t *spa, char *blkbuf, size_t buflen,
 		memcpy(&zstd_hdr, buf, sizeof (zstd_hdr));
 		free(buf);
 		zstd_hdr.c_len = BE_32(zstd_hdr.c_len);
-		// 16 MB is probably safe to assume byteswap
-		if (zstd_hdr.c_len > 0x10000000)
-			zstd_hdr.c_len = __builtin_bswap32(zstd_hdr.c_len);
 		zstd_hdr.raw_version_level = BE_32(zstd_hdr.raw_version_level);
 		(void) snprintf(blkbuf + strlen(blkbuf),
 		    buflen - strlen(blkbuf),
@@ -2373,9 +2370,6 @@ snprintf_zstd_header(spa_t *spa, char *blkbuf, size_t buflen,
 	buf = abd_borrow_buf_copy(pabd, BP_GET_LSIZE(bp));
 	memcpy(&zstd_hdr, buf, sizeof (zstd_hdr));
 	zstd_hdr.c_len = BE_32(zstd_hdr.c_len);
-	// 16 MB is probably safe to assume byteswap
-	if (zstd_hdr.c_len > 0x10000000)
-		zstd_hdr.c_len = __builtin_bswap32(zstd_hdr.c_len);
 	zstd_hdr.raw_version_level = BE_32(zstd_hdr.raw_version_level);
 
 	(void) snprintf(blkbuf + strlen(blkbuf),

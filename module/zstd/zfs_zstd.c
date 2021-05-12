@@ -555,13 +555,6 @@ zfs_zstd_decompress_level(void *s_start, void *d_start, size_t s_len,
 
 	hdr = (const zfs_zstdhdr_t *)s_start;
 	c_len = BE_32(hdr->c_len);
-	/*
-	 * Sometimes, BE systems mangle the c_len, so if we see a c_len
-	 * larger than 16 MB, it's probably safe to assume it got swapped,
-	 * since ZFS balks at blocks that large.
-	 */
-	if (c_len > 0x1000000)
-		c_len = __builtin_bswap32(c_len);
 
 	/*
 	 * Make a copy instead of directly converting the header, since we must
