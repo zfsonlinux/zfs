@@ -304,8 +304,9 @@ for_each_vdev_cb(zpool_handle_t *zhp, nvlist_t *nv, pool_vdev_iter_f func,
 	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE, &type) != 0)
 		return (ret);
 
-	/* Don't run our function on root vdevs */
-	if (strcmp(type, VDEV_TYPE_ROOT) != 0) {
+	/* Don't run our function on root or indirect vdevs */
+	if ((strcmp(type, VDEV_TYPE_ROOT) != 0) &&
+	    (strcmp(type, VDEV_TYPE_INDIRECT) != 0)) {
 		ret |= func(zhp, nv, data);
 	}
 

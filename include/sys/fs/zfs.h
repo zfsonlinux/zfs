@@ -346,7 +346,8 @@ typedef enum {
 	VDEV_PROP_BYTES_FREE,
 	VDEV_PROP_BYTES_CLAIM,
 	VDEV_PROP_BYTES_TRIM,
-	VDEV_PROP_NOALLOC,
+	VDEV_PROP_REMOVING,
+	VDEV_PROP_ALLOCATING,
 	VDEV_NUM_PROPS
 } vdev_prop_t;
 
@@ -1151,7 +1152,6 @@ typedef struct vdev_stat {
 	uint64_t	vs_checksum_errors;	/* checksum errors	*/
 	uint64_t	vs_initialize_errors;	/* initializing errors	*/
 	uint64_t	vs_self_healed;		/* self-healed bytes	*/
-	uint64_t	vs_noalloc;		/* allocations halted?	*/
 	uint64_t	vs_scan_removing;	/* removing?	*/
 	uint64_t	vs_scan_processed;	/* scan processed bytes	*/
 	uint64_t	vs_fragmentation;	/* device fragmentation */
@@ -1172,6 +1172,7 @@ typedef struct vdev_stat {
 	uint64_t	vs_configured_ashift;   /* TLV vdev_ashift */
 	uint64_t	vs_logical_ashift;	/* vdev_logical_ashift  */
 	uint64_t	vs_physical_ashift;	/* vdev_physical_ashift */
+	uint64_t	vs_noalloc;		/* allocations halted?	*/
 } vdev_stat_t;
 
 /* BEGIN CSTYLED */
@@ -1576,14 +1577,14 @@ typedef enum {
 /*
  * The following are names used when invoking ZFS_IOC_VDEV_GET_PROP.
  */
-#define	ZPOOL_VDEV_GET_PROPS_VDEV	"vdevprops_get_vdev"
-#define	ZPOOL_VDEV_GET_PROPS_PROPS	"vdevprops_get_props"
+#define	ZPOOL_VDEV_PROPS_GET_VDEV	"vdevprops_get_vdev"
+#define	ZPOOL_VDEV_PROPS_GET_PROPS	"vdevprops_get_props"
 
 /*
  * The following are names used when invoking ZFS_IOC_VDEV_SET_PROP.
  */
-#define	ZPOOL_VDEV_SET_PROPS_VDEV	"vdevprops_set_vdev"
-#define	ZPOOL_VDEV_SET_PROPS_PROPS	"vdevprops_set_props"
+#define	ZPOOL_VDEV_PROPS_SET_VDEV	"vdevprops_set_vdev"
+#define	ZPOOL_VDEV_PROPS_SET_PROPS	"vdevprops_set_props"
 
 /*
  * The following are names used when invoking ZFS_IOC_WAIT_FS.

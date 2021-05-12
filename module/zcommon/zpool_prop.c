@@ -357,12 +357,16 @@ vdev_prop_init(void)
 	    PROP_READONLY, ZFS_TYPE_VDEV, "<bytes>", "CLAIMBYTE");
 	zprop_register_number(VDEV_PROP_BYTES_TRIM, "trim_bytes", 0,
 	    PROP_READONLY, ZFS_TYPE_VDEV, "<bytes>", "TRIMBYTE");
+	/* XXX - register this as an index (yes | no) type? */
+	zprop_register_number(VDEV_PROP_REMOVING, "removing", 0,
+	    PROP_READONLY, ZFS_TYPE_VDEV, "<boolean>", "REMOVING");
 
 	/* default numeric properties */
 
 	/* default index (boolean) properties */
-	zprop_register_index(VDEV_PROP_NOALLOC, "noalloc", 0,
-	    PROP_DEFAULT, ZFS_TYPE_VDEV, "on | off", "NOALLOC", boolean_table);
+	zprop_register_index(VDEV_PROP_ALLOCATING, "allocating", 1,
+	    PROP_DEFAULT, ZFS_TYPE_VDEV, "on | off", "ALLOCATING",
+	    boolean_table);
 
 	/* default index properties */
 
@@ -398,10 +402,7 @@ vdev_prop_user(const char *name)
 			foundsep = B_TRUE;
 	}
 
-	if (!foundsep)
-		return (B_FALSE);
-
-	return (B_TRUE);
+	return (foundsep);
 }
 
 /*

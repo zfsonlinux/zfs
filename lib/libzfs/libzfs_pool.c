@@ -5076,8 +5076,8 @@ zpool_get_vdev_prop_value(nvlist_t *nvprop, vdev_prop_t prop, char *prop_name,
 			verify(nvlist_lookup_string(nv, ZPROP_VALUE,
 			    &strval) == 0);
 		} else {
-			src = ZPROP_SRC_NONE;
-			strval = "-";
+			/* user prop not found */
+			return (-1);
 		}
 		(void) strlcpy(buf, strval, len);
 		if (srctype)
@@ -5224,7 +5224,8 @@ zpool_get_vdev_prop(zpool_handle_t *zhp, const char *vdevname, vdev_prop_t prop,
     char *prop_name, char *buf, size_t len, zprop_source_t *srctype,
     boolean_t literal)
 {
-	nvlist_t *tgt, *reqnvl, *reqprops, *retprops;
+	nvlist_t *tgt, *reqnvl, *reqprops;
+	nvlist_t *retprops = NULL;
 	uint64_t vdev_guid;
 	boolean_t avail_spare, l2cache;
 	char errbuf[1024];
@@ -5238,8 +5239,12 @@ zpool_get_vdev_prop(zpool_handle_t *zhp, const char *vdevname, vdev_prop_t prop,
 	}
 
 	if ((tgt = zpool_find_vdev(zhp, vdevname, &avail_spare, &l2cache,
-	    NULL)) == NULL)
-		return (-1);
+	    NULL)) == NULL) {
+		(void) snprintf(errbuf, sizeof (errbuf),
+		    dgettext(TEXT_DOMAIN, "can not find %s in %s"),
+		    vdevname, zhp->zpool_name);
+		return (zfs_error(zhp->zpool_hdl, EZFS_NODEVICE, errbuf));
+	}
 
 	verify(nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_GUID, &vdev_guid) == 0);
 
@@ -5248,11 +5253,18 @@ zpool_get_vdev_prop(zpool_handle_t *zhp, const char *vdevname, vdev_prop_t prop,
 	if (nvlist_alloc(&reqprops, NV_UNIQUE_NAME, 0) != 0)
 		return (no_memory(zhp->zpool_hdl));
 
-	fnvlist_add_uint64(reqnvl, ZPOOL_VDEV_GET_PROPS_VDEV, vdev_guid);
+	fnvlist_add_uint64(reqnvl, ZPOOL_VDEV_PROPS_GET_VDEV, vdev_guid);
 
-	if (prop != VDEV_PROP_INVAL && prop_name == NULL)
-		prop_name = (char *)vdev_prop_to_name(prop);
+	if (prop != VDEV_PROP_INVAL) {
+		/* prop_name overrides prop value */
+		if (prop_name != NULL)
+			prop = vdev_name_to_prop(prop_name);
+		else
+			prop_name = (char *)vdev_prop_to_name(prop);
+	}
 
+	if (prop != VDEV_PROP_INVAL)
+		assert(prop < VDEV_NUM_PROPS);
 	assert(prop_name != NULL);
 	if (nvlist_add_uint64(reqprops, prop_name, prop) != 0) {
 		nvlist_free(reqnvl);
@@ -5260,7 +5272,7 @@ zpool_get_vdev_prop(zpool_handle_t *zhp, const char *vdevname, vdev_prop_t prop,
 		return (no_memory(zhp->zpool_hdl));
 	}
 
-	fnvlist_add_nvlist(reqnvl, ZPOOL_VDEV_GET_PROPS_PROPS, reqprops);
+	fnvlist_add_nvlist(reqnvl, ZPOOL_VDEV_PROPS_GET_PROPS, reqprops);
 
 	(void) snprintf(errbuf, sizeof (errbuf),
 	    dgettext(TEXT_DOMAIN, "cannot get vdev property %s from %s in %s"),
@@ -5295,7 +5307,7 @@ zpool_get_all_vdev_props(zpool_handle_t *zhp, const char *vdevname,
 	uint64_t vdev_guid;
 	boolean_t avail_spare, l2cache;
 	char errbuf[1024];
-	int ret = -1;
+	int ret;
 
 	verify(zhp != NULL);
 	if (zpool_get_state(zhp) == POOL_STATE_UNAVAIL) {
@@ -5317,7 +5329,7 @@ zpool_get_all_vdev_props(zpool_handle_t *zhp, const char *vdevname,
 	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
 		return (no_memory(zhp->zpool_hdl));
 
-	fnvlist_add_uint64(nvl, ZPOOL_VDEV_GET_PROPS_VDEV, vdev_guid);
+	fnvlist_add_uint64(nvl, ZPOOL_VDEV_PROPS_GET_VDEV, vdev_guid);
 
 	ret = lzc_get_vdev_prop(zhp->zpool_name, nvl, outnvl);
 
@@ -5336,7 +5348,7 @@ int
 zpool_set_vdev_prop(zpool_handle_t *zhp, const char *vdevname,
     const char *propname, const char *propval)
 {
-	int ret = -1;
+	int ret;
 	char errbuf[1024];
 	vdev_prop_t vprop;
 	nvlist_t *nvl = NULL;
@@ -5373,7 +5385,7 @@ zpool_set_vdev_prop(zpool_handle_t *zhp, const char *vdevname,
 	if (nvlist_alloc(&props, NV_UNIQUE_NAME, 0) != 0)
 		return (no_memory(zhp->zpool_hdl));
 
-	fnvlist_add_uint64(nvl, ZPOOL_VDEV_SET_PROPS_VDEV, vdev_guid);
+	fnvlist_add_uint64(nvl, ZPOOL_VDEV_PROPS_SET_VDEV, vdev_guid);
 
 	if (nvlist_add_string(props, propname, propval) != 0) {
 		nvlist_free(props);
@@ -5392,7 +5404,7 @@ zpool_set_vdev_prop(zpool_handle_t *zhp, const char *vdevname,
 	nvlist_free(props);
 	props = realprops;
 
-	fnvlist_add_nvlist(nvl, ZPOOL_VDEV_SET_PROPS_PROPS, props);
+	fnvlist_add_nvlist(nvl, ZPOOL_VDEV_PROPS_SET_PROPS, props);
 
 	ret = lzc_set_vdev_prop(zhp->zpool_name, nvl, &outnvl);
 

@@ -1824,13 +1824,15 @@ spa_update_dspace(spa_t *spa)
 {
 	spa->spa_dspace = metaslab_class_get_dspace(spa_normal_class(spa)) +
 	    ddt_get_dedup_dspace(spa);
-	if (spa->spa_vdev_removal != NULL) {
+	if (spa->spa_nonallocating_dspace > 0) {
 		/*
-		 * We can't allocate from the removing device, so subtract
-		 * its size if it was included in dspace (i.e. if this is a
-		 * normal-class vdev, not special/dedup).  This prevents the
-		 * DMU/DSL from filling up the (now smaller) pool while we
-		 * are in the middle of removing the device.
+		 * Subtract the space from all the non-allocating vdevs that
+		 * contribute to dspace. This provides a stable/consistent
+		 * value for the available space in the pool (i.e., if
+		 * the data on non-allocating drives is re-written the
+		 * available free space does not fluctuate oddly). It also
+		 * prevents the DMU/DSL from filling up the (now smaller)
+		 * pool if we are in the middle of removing a device.
 		 *
 		 * Note that the DMU/DSL doesn't actually know or care
 		 * how much space is allocated (it does its own tracking
@@ -1840,12 +1842,8 @@ spa_update_dspace(spa_t *spa)
 		 * device).
 		 */
 		spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
-		vdev_t *vd =
-		    vdev_lookup_top(spa, spa->spa_vdev_removal->svr_vdev_id);
-		if (vd->vdev_mg->mg_class == spa_normal_class(spa)) {
-			spa->spa_dspace -= spa_deflate(spa) ?
-			    vd->vdev_stat.vs_dspace : vd->vdev_stat.vs_space;
-		}
+		ASSERT3U(spa->spa_dspace, >, spa->spa_nonallocating_dspace);
+		spa->spa_dspace -= spa->spa_nonallocating_dspace;
 		spa_config_exit(spa, SCL_VDEV, FTAG);
 	}
 }

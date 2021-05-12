@@ -171,9 +171,20 @@ static void
 vdev_activate(vdev_t *vd)
 {
 	metaslab_group_t *mg = vd->vdev_mg;
-	metaslab_group_activate(mg);
+	spa_t *spa = vd->vdev_spa;
+
 	ASSERT(!vd->vdev_islog);
+	ASSERT(vd->vdev_noalloc);
+
+	metaslab_group_activate(mg);
 	metaslab_group_activate(vd->vdev_log_mg);
+
+	ASSERT3U(spa->spa_nonallocating_dspace, >=, spa_deflate(spa) ?
+	    vd->vdev_stat.vs_dspace : vd->vdev_stat.vs_space);
+
+	spa->spa_nonallocating_dspace -= spa_deflate(spa) ?
+	    vd->vdev_stat.vs_dspace : vd->vdev_stat.vs_space;
+
 	vd->vdev_noalloc = B_FALSE;
 }
 
@@ -1210,6 +1221,15 @@ vdev_remove_complete(spa_t *spa)
 	zfs_dbgmsg("finishing device removal for vdev %llu in txg %llu",
 	    (u_longlong_t)vd->vdev_id, (u_longlong_t)txg);
 
+	ASSERT3U(0, <, spa_deflate(spa) ?
+	    vd->vdev_stat.vs_dspace : vd->vdev_stat.vs_space);
+	ASSERT3U(spa->spa_nonallocating_dspace, >=, spa_deflate(spa) ?
+	    vd->vdev_stat.vs_dspace : vd->vdev_stat.vs_space);
+
+	/* the vdev is no longer part of the dspace */
+	spa->spa_nonallocating_dspace -= spa_deflate(spa) ?
+	    vd->vdev_stat.vs_dspace : vd->vdev_stat.vs_space;
+
 	/*
 	 * Discard allocation state.
 	 */
@@ -1635,7 +1655,7 @@ vdev_prop_noalloc(vdev_t *vd)
 	spa_t *spa = vd->vdev_spa;
 	objset_t *mos = spa->spa_meta_objset;
 	uint64_t objid;
-	uint64_t noalloc = 0;
+	uint64_t allocating = 1;
 	int err = 0;
 
 	ASSERT(vd != NULL);
@@ -1655,8 +1675,8 @@ vdev_prop_noalloc(vdev_t *vd)
 
 	mutex_enter(&spa->spa_props_lock);
 
-	err = zap_lookup(mos, objid, vdev_prop_to_name(VDEV_PROP_NOALLOC),
-	    sizeof (uint64_t), 1, &noalloc);
+	err = zap_lookup(mos, objid, vdev_prop_to_name(VDEV_PROP_ALLOCATING),
+	    sizeof (uint64_t), 1, &allocating);
 
 	mutex_exit(&spa->spa_props_lock);
 
@@ -1664,7 +1684,7 @@ vdev_prop_noalloc(vdev_t *vd)
 		return (B_FALSE);
 	}
 
-	return (noalloc > 0);
+	return (allocating == 0);
 }
 
 /* ARGSUSED */
@@ -2028,6 +2048,11 @@ spa_vdev_remove_top_check(vdev_t *vd)
 	if (!spa_feature_is_enabled(spa, SPA_FEATURE_DEVICE_REMOVAL))
 		return (SET_ERROR(ENOTSUP));
 
+	/*
+	 * This device is already being removed
+	 */
+	if (vd->vdev_removing)
+		return (SET_ERROR(EALREADY));
 
 	metaslab_class_t *mc = vd->vdev_mg->mg_class;
 	metaslab_class_t *normal = spa_normal_class(spa);
@@ -2050,13 +2075,15 @@ spa_vdev_remove_top_check(vdev_t *vd)
 		/* available space in the pool's normal class */
 		uint64_t available = dsl_dir_space_available(
 		    spa->spa_dsl_pool->dp_root_dir, NULL, 0, B_TRUE);
-		if (available <
-		    vd->vdev_stat.vs_dspace + spa_get_slop_space(spa)) {
+		/* non-allocating vdevs have already been taken out of space */
+		if (!vd->vdev_noalloc)
+			available -= vd->vdev_stat.vs_dspace;
+		if (available < spa_get_slop_space(spa)) {
 			/*
-			 * This is a normal device. There has to be enough free
-			 * space to remove the device and leave double the
-			 * "slop" space (i.e. we must leave at least 3% of the
-			 * pool free, in addition to the normal slop space).
+			 * There has to be enough free space to remove the
+			 * device and leave double the "slop" space (i.e.
+			 * we must leave at least 3% of the pool free, in
+			 * addition to the normal slop space).
 			 */
 			return (SET_ERROR(ENOSPC));
 		}
@@ -2161,7 +2188,7 @@ spa_vdev_alloc(spa_t *spa, uint64_t guid)
 		error = SET_ERROR(ENOENT);
 	else if (vd->vdev_mg == NULL)
 		error = SET_ERROR(ENOTSUP);
-	else
+	else if (!vd->vdev_removing)
 		vdev_activate(vd);
 
 	if (error == 0) {
@@ -2179,6 +2206,8 @@ vdev_passivate(vdev_t *vd, uint64_t *txg)
 {
 	spa_t *spa = vd->vdev_spa;
 	int error;
+
+	ASSERT(!vd->vdev_noalloc);
 
 	vdev_t *rvd = spa->spa_root_vdev;
 	metaslab_group_t *mg = vd->vdev_mg;
@@ -2239,6 +2268,8 @@ vdev_passivate(vdev_t *vd, uint64_t *txg)
 		return (error);
 	}
 
+	spa->spa_nonallocating_dspace += spa_deflate(spa) ?
+	    vd->vdev_stat.vs_dspace : vd->vdev_stat.vs_space;
 	vd->vdev_noalloc = B_TRUE;
 
 	return (0);
@@ -2337,7 +2368,7 @@ spa_vdev_noalloc(spa_t *spa, uint64_t guid)
 {
 	vdev_t *vd;
 	uint64_t txg;
-	int error;
+	int error = 0;
 
 	ASSERT(!MUTEX_HELD(&spa_namespace_lock));
 	ASSERT(spa_writeable(spa));
@@ -2352,7 +2383,7 @@ spa_vdev_noalloc(spa_t *spa, uint64_t guid)
 		error = SET_ERROR(ENOENT);
 	else if (vd->vdev_mg == NULL)
 		error = SET_ERROR(ENOTSUP);
-	else
+	else if (!vd->vdev_noalloc)
 		error = vdev_passivate(vd, &txg);
 
 	if (error == 0) {
