@@ -371,12 +371,14 @@ zfs_set_hdrversion(zfs_zstdhdr_t *blob, uint32_t version)
 {
 #ifdef _ZFS_LITTLE_ENDIAN
 	void *dst = (void *)(((uintptr_t)&(blob->raw_version_level)));
+	uint8_t *src = ((uint8_t *)&version);
 #else
 #ifdef _ZFS_BIG_ENDIAN
-	void *dst = (void *)(((uintptr_t)&(blob->raw_version_level))+3);
+	void *dst = (void *)(((uintptr_t)&(blob->raw_version_level))+1);
+	uint8_t *src = ((uint8_t *)&version)+1;
 #endif
 #endif
-	memcpy(dst, &version, 3);
+	memcpy(dst, src, 3);
 	return (0);
 }
 

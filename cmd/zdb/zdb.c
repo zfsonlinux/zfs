@@ -2263,7 +2263,7 @@ zfs_get_hdrversion(const zfs_zstdhdr_t *blob)
 		version_final = (
 		    ((version_wip <<  8) & 0x00FF0000) |
 		    ((version_wip >>  8) & 0x0000FF00) |
-		    ((version_wip >> 16) & 0x000000FF));
+		    ((version_wip >> 24) & 0x000000FF));
 		break;
 		case 2:
 		version_final = (
