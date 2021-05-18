@@ -327,6 +327,9 @@ zfs_agent_dispatch(const char *class, const char *subclass, nvlist_t *nvl)
 static void *
 zfs_agent_consumer_thread(void *arg)
 {
+#ifdef __APPLE__
+	pthread_setname_np("agents");
+#endif
 	for (;;) {
 		agent_event_t *event;
 
@@ -392,7 +395,9 @@ zfs_agent_init(libzfs_handle_t *zfs_hdl)
 		list_destroy(&agent_events);
 		zed_log_die("Failed to initialize agents");
 	}
+#ifndef __APPLE__
 	pthread_setname_np(g_agents_tid, "agents");
+#endif
 }
 
 void

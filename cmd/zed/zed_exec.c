@@ -198,6 +198,9 @@ _reap_children(void *arg)
 	struct rusage usage;
 	struct sigaction sa = {};
 
+#ifdef __APPLE__
+	pthread_setname_np("reap ZEDLETs");
+#endif
 	(void) sigfillset(&sa.sa_mask);
 	(void) sigdelset(&sa.sa_mask, SIGCHLD);
 	(void) pthread_sigmask(SIG_SETMASK, &sa.sa_mask, NULL);
@@ -334,8 +337,9 @@ zed_exec_process(uint64_t eid, const char *class, const char *subclass,
 		if (pthread_create(&_reap_children_tid, NULL,
 		    _reap_children, NULL) != 0)
 			return (-1);
+#ifndef __APPLE__
 		pthread_setname_np(_reap_children_tid, "reap ZEDLETs");
-
+#endif
 		avl_create(&_launched_processes, _launched_process_node_compare,
 		    sizeof (struct launched_process_node),
 		    offsetof(struct launched_process_node, node));

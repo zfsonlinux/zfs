@@ -164,6 +164,10 @@ zed_udev_monitor(void *arg)
 	struct udev_monitor *mon = arg;
 	char *tmp, *tmp2;
 
+#ifdef __APPLE__
+	pthread_setname_np("udev monitor");
+#endif
+
 	zed_log_msg(LOG_INFO, "Waiting for new udev disk events...");
 
 	while (1) {
@@ -381,7 +385,9 @@ zed_disk_event_init()
 		return (-1);
 	}
 
+#ifndef __APPLE__
 	pthread_setname_np(g_mon_tid, "udev monitor");
+#endif
 	zed_log_msg(LOG_INFO, "zed_disk_event_init");
 
 	return (0);
