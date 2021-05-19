@@ -3073,11 +3073,11 @@ zpool_vdev_online(zpool_handle_t *zhp, const char *path, int flags,
 		}
 
 		if (wholedisk) {
-			const char *fullpath = path;
+			const char *fullpath = pathname;
 			char buf[MAXPATHLEN];
 
-			if (path[0] != '/') {
-				error = zfs_resolve_shortname(path, buf,
+			if (pathname[0] != '/') {
+				error = zfs_resolve_shortname(pathname, buf,
 				    sizeof (buf));
 				if (error != 0)
 					return (zfs_error(hdl, EZFS_NODEVICE,
