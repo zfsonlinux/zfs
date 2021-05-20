@@ -247,19 +247,13 @@ zfs_mod_list_supported_free(struct zfs_mod_supported_features *list)
 static boolean_t
 zfs_mod_supported_impl(const char *scope, const char *name, const char *sysfs)
 {
-	boolean_t supported = B_FALSE;
-	char *path;
-
-	int len = asprintf(&path, "%s%s%s%s%s", sysfs,
-	    scope == NULL ? "" : "/", scope == NULL ? "" : scope,
-	    name == NULL ? "" : "/", name == NULL ? "" : name);
-	if (len > 0) {
-		struct stat64 statbuf;
-		supported = !!(stat64(path, &statbuf) == 0);
-		free(path);
-	}
-
-	return (supported);
+	char path[128];
+	if (snprintf(path, sizeof (path), "%s%s%s%s%s", sysfs,
+	    scope == NULL ? "" : "/", scope ?: "",
+	    name == NULL ? "" : "/", name ?: "") != sizeof (path))
+		return (access(path, F_OK) == 0);
+	else
+		return (B_FALSE);
 }
 
 boolean_t
