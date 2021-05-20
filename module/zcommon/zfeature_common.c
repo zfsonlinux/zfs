@@ -280,10 +280,10 @@ zfs_mod_supported(const char *scope, const char *name,
 	 * scope directory does not exist.
 	 */
 	if (supported == B_FALSE) {
-		struct stat64 statbuf;
-		if ((stat64(ZFS_SYSFS_DIR, &statbuf) == 0) &&
-		    !zfs_mod_supported_impl(scope, NULL, ZFS_SYSFS_DIR) &&
-		    !zfs_mod_supported_impl(scope, NULL, ZFS_SYSFS_ALT_DIR)) {
+		if ((access(ZFS_SYSFS_DIR, F_OK) == 0 &&
+		    !zfs_mod_supported_impl(scope, NULL, ZFS_SYSFS_DIR)) ||
+		    (access(ZFS_SYSFS_ALT_DIR, F_OK) == 0 &&
+		    !zfs_mod_supported_impl(scope, NULL, ZFS_SYSFS_ALT_DIR))) {
 			supported = B_TRUE;
 		}
 	}
