@@ -247,3 +247,11 @@ zfs_dev_flush(int fd __unused)
 {
 	return (0);
 }
+
+/*
+ * Nothing to do - we only record the enclosure sysfs path on Linux.
+ */
+void
+update_vdevs_config_dev_sysfs_path(nvlist_t *config)
+{
+}
