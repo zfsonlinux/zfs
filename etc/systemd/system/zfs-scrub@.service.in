@@ -1,0 +1,10 @@
+[Unit]
+Description=zpool scrub on %i
+Documentation=man:zpool-scrub(8)
+Requires=zfs.target
+After=zfs.target
+ConditionPathIsDirectory=/sys/module/zfs
+
+[Service]
+KillSignal=SIGINT
+ExecStart=@sbindir@/zpool scrub %i

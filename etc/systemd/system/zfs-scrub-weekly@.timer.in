@@ -1,0 +1,12 @@
+[Unit]
+Description=Weekly zpool scrub timer for %i
+Documentation=man:zpool-scrub(8)
+
+[Timer]
+OnCalendar=weekly
+AccuracySec=1h
+Persistent=true
+Unit=zfs-scrub@%i.service
+
+[Install]
+WantedBy=timers.target
