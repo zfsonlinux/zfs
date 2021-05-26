@@ -1757,6 +1757,7 @@ addlist(libzfs_handle_t *hdl, char *propname, zprop_list_t **listp,
 	 * dataset property,
 	 */
 	if (prop == ZPROP_INVAL && ((type == ZFS_TYPE_POOL &&
+	    !zfs_prop_user(propname) &&
 	    !zpool_prop_feature(propname) &&
 	    !zpool_prop_unsupported(propname)) ||
 	    (type == ZFS_TYPE_DATASET && !zfs_prop_user(propname) &&
