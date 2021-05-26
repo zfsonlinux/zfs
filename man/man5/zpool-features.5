@@ -17,7 +17,7 @@
 .\" Copyright (c) 2019, Klara Inc.
 .\" Copyright (c) 2019, Allan Jude
 .\" Copyright (c) 2021, Colm Buckley <colm@tuatha.org>
-.TH ZPOOL-FEATURES 5 "Aug 24, 2020" OpenZFS
+.TH ZPOOL-FEATURES 5 "Apr 9, 2021" OpenZFS
 .SH NAME
 zpool\-features \- ZFS pool feature descriptions
 .SH DESCRIPTION
@@ -266,6 +266,30 @@ of space remaining to be reclaimed by the background process is available
 through the \fBfreeing\fR property.
 
 This feature is only \fBactive\fR while \fBfreeing\fR is non\-zero.
+.RE
+
+.sp
+.ne 2
+.na
+\fBblake3\fR
+.ad
+.RS 4n
+.TS
+l l .
+GUID	org.openzfs:blake3
+READ\-ONLY COMPATIBLE	no
+DEPENDENCIES	extensible_dataset
+.TE
+
+This feature enables the use of the Blake3 hash algorithm for checksum
+and dedup. Blake3 is a high-performance secure hash algorithm... XXX / TODO
+
+When the \fBblake3\fR feature is set to \fBenabled\fR, the administrator
+can turn on the \fBblake3\fR checksum on any dataset using
+\fBzfs set checksum=blake3\fR. See zfs(8). This feature becomes
+\fBactive\fR once a \fBchecksum\fR property has been set to \fBblake3\fR,
+and will return to being \fBenabled\fR once all filesystems that have
+ever had their checksum set to \fBblake3\fR are destroyed.
 .RE
 
 .sp

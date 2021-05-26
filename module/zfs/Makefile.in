@@ -16,6 +16,7 @@ ccflags-$(CONFIG_SPARC64) += -Wno-unused-value
 $(MODULE)-objs += abd.o
 $(MODULE)-objs += aggsum.o
 $(MODULE)-objs += arc.o
+$(MODULE)-objs += blake3_zfs.o
 $(MODULE)-objs += blkptr.o
 $(MODULE)-objs += bplist.o
 $(MODULE)-objs += bpobj.o

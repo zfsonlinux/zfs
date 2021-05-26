@@ -21,7 +21,8 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
- * Copyright Saso Kiselkov 2013, All rights reserved.
+ * Copyright (c) 2013 Saso Kiselkov, All rights reserved.
+ * Copyright (c) 2021 Tino Reichardt <milky-zfs@mcmilk.de>
  */
 
 #ifndef _SYS_ZIO_CHECKSUM_H
@@ -106,6 +107,13 @@ extern zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS];
 /*
  * Checksum routines.
  */
+
+/* Fletcher 4 */
+extern zio_abd_checksum_func_t fletcher_4_abd_ops;
+extern zio_checksum_t abd_fletcher_4_native;
+extern zio_checksum_t abd_fletcher_4_byteswap;
+
+/* SHA2 */
 extern zio_checksum_t abd_checksum_SHA256;
 extern zio_checksum_t abd_checksum_SHA512_native;
 extern zio_checksum_t abd_checksum_SHA512_byteswap;
@@ -122,9 +130,11 @@ extern zio_checksum_t abd_checksum_edonr_byteswap;
 extern zio_checksum_tmpl_init_t abd_checksum_edonr_tmpl_init;
 extern zio_checksum_tmpl_free_t abd_checksum_edonr_tmpl_free;
 
-extern zio_abd_checksum_func_t fletcher_4_abd_ops;
-extern zio_checksum_t abd_fletcher_4_native;
-extern zio_checksum_t abd_fletcher_4_byteswap;
+/* BLAKE3 */
+extern zio_checksum_t abd_checksum_blake3_native;
+extern zio_checksum_t abd_checksum_blake3_byteswap;
+extern zio_checksum_tmpl_init_t abd_checksum_blake3_tmpl_init;
+extern zio_checksum_tmpl_free_t abd_checksum_blake3_tmpl_free;
 
 extern int zio_checksum_equal(spa_t *, blkptr_t *, enum zio_checksum,
     void *, uint64_t, uint64_t, zio_bad_cksum_t *);
