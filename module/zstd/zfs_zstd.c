@@ -369,16 +369,7 @@ zstd_enum_to_level(enum zio_zstd_levels level, int16_t *zstd_level)
 static size_t
 zfs_set_hdrversion(zfs_zstdhdr_t *blob, uint32_t version)
 {
-#ifdef _ZFS_LITTLE_ENDIAN
-	void *dst = (void *)(((uintptr_t)&(blob->raw_version_level)));
-	uint8_t *src = ((uint8_t *)&version);
-#else
-#ifdef _ZFS_BIG_ENDIAN
-	void *dst = (void *)(((uintptr_t)&(blob->raw_version_level))+1);
-	uint8_t *src = ((uint8_t *)&version)+1;
-#endif
-#endif
-	memcpy(dst, src, 3);
+	BF32_SET(blob->raw_version_level, 0, 24, version);
 	return (0);
 }
 
@@ -395,47 +386,38 @@ zfs_get_hdrlevel(const zfs_zstdhdr_t *blob)
 	 * "next" to it in the range are the other version bytes, in order,
 	 * and whichever byte remains is the level field.
 	 */
-	uint32_t level_wip, level_final;
+	uint32_t level = blob->raw_version_level;
 	uint8_t findme = 0xff;
-	void *wip = (void *)(((uintptr_t)&(blob->raw_version_level)));
-	level_wip = *((uint32_t *)wip);
 	int shift;
 	for (shift = 0; shift < 4; shift++) {
-		findme = ((level_wip >> (8*shift)) & 0x000000FF);
+		findme = BF32_GET(level, 8*shift, 8);
 		if (findme == 0)
 			break;
 	}
 	switch (shift) {
 		case 0:
-		level_final = ((level_wip >> 24) & 0x000000FF);
+		level = BF32_GET(level, 24, 8);
 		break;
 		case 1:
-		level_final = ((level_wip)	 & 0x000000FF);
+		level = BF32_GET(level, 0, 8);
 		break;
 		case 2:
-		level_final = ((level_wip >> 24) & 0x000000FF);
+		level = BF32_GET(level, 24, 8);
 		break;
 		case 3:
-		level_final = ((level_wip)	 & 0x000000FF);
+		level = BF32_GET(level, 0, 8);
 		break;
 		default:
-		level_final = 0;
+		level = 0;
 		break;
 	}
-	return (level_final);
+	return (level);
 }
 
 static size_t
 zfs_set_hdrlevel(zfs_zstdhdr_t *blob, uint8_t level)
 {
-#ifdef	_ZFS_LITTLE_ENDIAN
-	uint8_t *dst = (((uint8_t *)&(blob->raw_version_level))+3);
-#else
-#ifdef _ZFS_BIG_ENDIAN
-	uint8_t *dst = (((uint8_t *)&(blob->raw_version_level)));
-#endif
-#endif
-	*dst = level;
+	BF32_SET(blob->raw_version_level, 24, 8, level);
 	return (0);
 }
 
@@ -843,7 +825,7 @@ module_exit(zstd_fini);
 
 ZFS_MODULE_DESCRIPTION("ZSTD Compression for ZFS");
 ZFS_MODULE_LICENSE("Dual BSD/GPL");
-ZFS_MODULE_VERSION(ZSTD_VERSION_STRING);
+ZFS_MODULE_VERSION(ZSTD_VERSION_STRING "a");
 
 EXPORT_SYMBOL(zfs_zstd_compress);
 EXPORT_SYMBOL(zfs_zstd_decompress_level);

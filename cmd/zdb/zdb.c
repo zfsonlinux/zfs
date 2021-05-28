@@ -2242,82 +2242,75 @@ zfs_get_hdrversion(const zfs_zstdhdr_t *blob)
 	 * "next" to it in the range are the other version bytes, in order,
 	 * and whichever byte remains is the level field.
 	 */
-	uint32_t version_wip, version_final;
+	uint32_t version = blob->raw_version_level;
 	uint8_t findme = 0xff;
-	void *wip = (void*)(((uintptr_t)&(blob->raw_version_level)));
-	version_wip = *((uint32_t *)wip);
 	int shift;
 	for (shift = 0; shift < 4; shift++) {
-		findme = ((version_wip >> (8*shift)) & 0x000000FF);
+		findme = BF32_GET(version, 8*shift, 8);
 		if (findme == 0)
 			break;
 	}
 	switch (shift) {
 		case 0:
-		version_final = (
-		    ((version_wip << 16) & 0x00FF0000) |
-		    ((version_wip)	 & 0x0000FF00) |
-		    ((version_wip >> 16) & 0x000000FF));
+		version = BSWAP_32(version);
+		version = BF32_GET(version, 8, 24);
 		break;
 		case 1:
-		version_final = (
-		    ((version_wip <<  8) & 0x00FF0000) |
-		    ((version_wip >>  8) & 0x0000FF00) |
-		    ((version_wip >> 24) & 0x000000FF));
+		version = BSWAP_32(version);
+		version = BF32_GET(version, 0, 24);
 		break;
 		case 2:
-		version_final = (
-		    ((version_wip)	 & 0x00FF0000) |
-		    ((version_wip)	 & 0x0000FF00) |
-		    ((version_wip)	 & 0x000000FF));
+		version = BF32_GET(version, 0, 24);
 		break;
 		case 3:
-		version_final = (
-		    ((version_wip >>  8) & 0x00FF0000) |
-		    ((version_wip >>  8) & 0x0000FF00) |
-		    ((version_wip >>  8) & 0x000000FF));
+		version = BF32_GET(version, 8, 24);
 		break;
 		default:
-		version_final = 0;
+		version = 0;
 		break;
 	}
-	return (version_final);
+	return (version);
 }
 
 static uint8_t
 zfs_get_hdrlevel(const zfs_zstdhdr_t *blob)
 {
 	/*
-	 * See comment at the top of zfs_get_hdrversion.
+	 * So we're searching 4 bytes to figure out where the version
+	 * and level bytes are. The level bytes can cover the whole range
+	 * of uint8_t, and so are not helpful. Fortunately, the version
+	 * field is going to have a leading 00 from now until version
+	 * 6.55.56 or higher with how it's represented, so we can dig
+	 * that out, and know that wherever we found it, the two bytes
+	 * "next" to it in the range are the other version bytes, in order,
+	 * and whichever byte remains is the level field.
 	 */
-	uint32_t level_wip, level_final;
+	uint32_t level = blob->raw_version_level;
 	uint8_t findme = 0xff;
-	void *wip = (void *)(((uintptr_t)&(blob->raw_version_level)));
-	level_wip = *((uint32_t *)wip);
 	int shift;
 	for (shift = 0; shift < 4; shift++) {
-		findme = ((level_wip >> (8*shift)) & 0x000000FF);
+		findme = BF32_GET(level, 8*shift, 8);
 		if (findme == 0)
 			break;
 	}
 	switch (shift) {
 		case 0:
-		level_final = ((level_wip >> 24) & 0x000000FF);
+		level = BF32_GET(level, 24, 8);
 		break;
 		case 1:
-		level_final = ((level_wip)	 & 0x000000FF);
+		level = BF32_GET(level, 0, 8);
 		break;
 		case 2:
-		level_final = ((level_wip >> 24) & 0x000000FF);
+		level = BF32_GET(level, 24, 8);
 		break;
 		case 3:
-		level_final = ((level_wip)	 & 0x000000FF);
+		level = BF32_GET(level, 0, 8);
 		break;
 		default:
-		level_final = 0;
+		level = 0;
 		break;
 	}
-	return (level_final);
+	return (level);
 }
 
 static void
