@@ -67,6 +67,14 @@ typedef struct zfs_zstd_header {
 } zfs_zstdhdr_t;
 
 /*
+ * Simple struct to pass the data from raw_version_level around.
+ */
+typedef struct zfs_zstd_meta {
+	uint8_t level;
+	uint32_t version;
+} zfs_zstdmeta_t;
+
+/*
  * kstat helper macros
  */
 #define	ZSTDSTAT(stat)		(zstd_stats.stat.value.ui64)
@@ -88,6 +96,123 @@ int zfs_zstd_decompress_level(void *s_start, void *d_start, size_t s_len,
 int zfs_zstd_decompress(void *s_start, void *d_start, size_t s_len,
     size_t d_len, int n);
 void zfs_zstd_cache_reap_now(void);
+
+/*
+ * So, the reason we have all these complicated set/get functions is that
+ * originally, in the zstd "header" we wrote out to disk, we used a 32-bit
+ * bitfield to store the "level" (8 bits) and "version" (24 bits).
+ *
+ * Unfortunately, bitfields make few promises about how they're arranged in
+ * memory...
+ *
+ * As a consequence, we wound up with little endian platforms with a layout
+ * like this in memory:
+ *
+ *      32      24      16      8       0
+ *      +-------+-------+-------+-------+
+ *      | level |   0   |    version    |
+ *      +-------+-------+-------+-------+
+ *
+ * ...and then, after being run through BE_32(), serializing this out to
+ * disk (BS16 indicates an order swap between the two bytes):
+ *
+ *      32      24      16      8       0
+ *      +-------+-------+-------+-------+
+ *      | BS16(version) |   0   | level |
+ *      +-------+-------+-------+-------+
+ *
+ * while on big-endian systems, since BE_32() is a noop there, both in
+ * memory and on disk, we wind up with:
+ *
+ *      32      24      16      8       0
+ *      +-------+-------+-------+-------+
+ *      |   0   |    version    | level |
+ *      +-------+-------+-------+-------+
+ *
+ * (The "0" byte is part of the version field, but will remain 0 until
+ * version 6.55.36, so it is useful both for illustration purposes
+ * and for the "get" code below to know which possible layout of the
+ * header we're dealing with.)
+ *
+ * So now we use the BF32_SET macros to get consistent behavior (the
+ * BSWAP_32(LE) encoding, since x86 currently rules the world) across
+ * platforms, but the "get" behavior requires that we check each of the
+ * bytes in the aforementioned former-bitfield for 0x00, and from there,
+ * we can know which possible layout we're dealing with. (Only the two
+ * that have been observed in the wild are illustrated above, but handlers
+ * for all 4 positions of 0x00 are implemented.
+ */
+
+static inline void
+zfs_get_hdrmeta(const zfs_zstdhdr_t *blob, zfs_zstdmeta_t *res)
+{
+	uint32_t raw = blob->raw_version_level;
+	uint8_t findme = 0xff;
+	int shift;
+	for (shift = 0; shift < 4; shift++) {
+		findme = BF32_GET(raw, 8*shift, 8);
+		if (findme == 0)
+			break;
+	}
+	switch (shift) {
+		case 0:
+		res->level = BF32_GET(raw, 24, 8);
+		res->version = BSWAP_32(raw);
+		res->version = BF32_GET(res->version, 8, 24);
+		break;
+		case 1:
+		res->level = BF32_GET(raw, 0, 8);
+		res->version = BSWAP_32(raw);
+		res->version = BF32_GET(res->version, 0, 24);
+		break;
+		case 2:
+		res->level = BF32_GET(raw, 24, 8);
+		res->version = BF32_GET(raw, 0, 24);
+		break;
+		case 3:
+		res->level = BF32_GET(raw, 0, 8);
+		res->version = BF32_GET(raw, 8, 24);
+		break;
+		default:
+		res->level = 0;
+		res->version = 0;
+		break;
+	}
+}
+
+static inline uint8_t
+zfs_get_hdrlevel(const zfs_zstdhdr_t *blob)
+{
+	uint8_t level = 0;
+	zfs_zstdmeta_t res;
+	zfs_get_hdrmeta(blob, &res);
+	level = res.level;
+	return (level);
+}
+
+static inline uint32_t
+zfs_get_hdrversion(const zfs_zstdhdr_t *blob)
+{
+	uint32_t version = 0;
+	zfs_zstdmeta_t res;
+	zfs_get_hdrmeta(blob, &res);
+	version = res.version;
+	return (version);
+
+}
+
+static inline void
+zfs_set_hdrversion(zfs_zstdhdr_t *blob, uint32_t version)
+{
+	BF32_SET(blob->raw_version_level, 0, 24, version);
+}
+
+static inline void
+zfs_set_hdrlevel(zfs_zstdhdr_t *blob, uint8_t level)
+{
+	BF32_SET(blob->raw_version_level, 24, 8, level);
+}
+
 
 #ifdef	__cplusplus
 }
