@@ -905,6 +905,9 @@ label_offset(uint64_t size, int l)
 	    0 : size - VDEV_LABELS * sizeof (vdev_label_t)));
 }
 
+#ifdef __APPLE__
+/* We have our own */
+#else
 /*
  * The same description applies as to zpool_read_label below,
  * except here we do it without aio, presumably because an aio call
@@ -1112,6 +1115,7 @@ zpool_read_label(int fd, nvlist_t **config, int *num_labels)
 
 	return (0);
 }
+#endif /* APPLE */
 
 /*
  * Sorted by full path and then vdev guid to allow for multiple entries with
