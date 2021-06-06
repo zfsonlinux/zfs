@@ -3947,9 +3947,15 @@ zfs_destroy_snaps(zfs_handle_t *zhp, char *snapname, boolean_t defer)
 int
 zfs_destroy_snaps_nvl(libzfs_handle_t *hdl, nvlist_t *snaps, boolean_t defer)
 {
-	int ret;
+	int ret = 0;
 	nvlist_t *errlist = NULL;
 	nvpair_t *pair;
+
+#ifdef __APPLE__
+	ret = zfs_destroy_snaps_nvl_os(hdl, snaps);
+	if (ret != 0)
+		return (ret);
+#endif
 
 	ret = lzc_destroy_snaps(snaps, defer, &errlist);
 
