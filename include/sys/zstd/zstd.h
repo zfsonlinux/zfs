@@ -110,15 +110,15 @@ void zfs_zstd_cache_reap_now(void);
  *
  *      32      24      16      8       0
  *      +-------+-------+-------+-------+
- *      | level |   0   |    version    |
+ *      | level |  v0   |  v1   |  v2   |
  *      +-------+-------+-------+-------+
  *
  * ...and then, after being run through BE_32(), serializing this out to
- * disk (BS16 indicates an order swap between the two bytes):
+ * disk:
  *
  *      32      24      16      8       0
  *      +-------+-------+-------+-------+
- *      | BS16(version) |   0   | level |
+ *      |  v2   |  v1   |  v0   | level |
  *      +-------+-------+-------+-------+
  *
  * while on big-endian systems, since BE_32() is a noop there, both in
@@ -126,13 +126,11 @@ void zfs_zstd_cache_reap_now(void);
  *
  *      32      24      16      8       0
  *      +-------+-------+-------+-------+
- *      | level | BS16(version) |   0   |
+ *      | level |  v2   |  v1   |  v0   |
  *      +-------+-------+-------+-------+
  *
- * (The "0" byte is part of the version field, but will remain 0 until
- * version 6.55.36, so it is useful both for illustration purposes
- * and for the "get" code below to know which possible layout of the
- * header we're dealing with.)
+ * (v0 is always 0 until version exceeds 6.55.35. v1 and v2 are the other
+ * two bytes of the "version" data.)
  *
  * So now we use the BF32_SET macros to get consistent behavior (the
  * BSWAP_32(LE) encoding, since x86 currently rules the world) across
