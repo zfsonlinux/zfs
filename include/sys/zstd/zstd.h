@@ -126,7 +126,7 @@ void zfs_zstd_cache_reap_now(void);
  *
  *      32      24      16      8       0
  *      +-------+-------+-------+-------+
- *      |   0   |    version    | level |
+ *      | level | BS16(version) |   0   |
  *      +-------+-------+-------+-------+
  *
  * (The "0" byte is part of the version field, but will remain 0 until
