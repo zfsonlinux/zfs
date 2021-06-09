@@ -11,6 +11,15 @@ noinst_LTLIBRARIES = libicp.la
 
 if TARGET_CPU_X86_64
 ASM_SOURCES_C = asm-x86_64/aes/aeskey.c
+
+if BUILD_MACOS
+ASM_SOURCES_AS = \
+	asm-x86_64/os/macos/aes/aes_amd64.S \
+	asm-x86_64/os/macos/aes/aes_aesni.S \
+	asm-x86_64/os/macos/modes/gcm_pclmulqdq.S \
+	asm-x86_64/os/macos/sha2/sha256_impl.S \
+	asm-x86_64/os/macos/sha2/sha512_impl.S
+else
 ASM_SOURCES_AS = \
 	asm-x86_64/aes/aes_amd64.S \
 	asm-x86_64/aes/aes_aesni.S \
@@ -20,6 +29,8 @@ ASM_SOURCES_AS = \
 	asm-x86_64/sha1/sha1-x86_64.S \
 	asm-x86_64/sha2/sha256_impl.S \
 	asm-x86_64/sha2/sha512_impl.S
+endif
+
 else
 ASM_SOURCES_C =
 ASM_SOURCES_AS =
@@ -71,6 +82,4 @@ KERNEL_ASM = $(ASM_SOURCES_AS)
 nodist_libicp_la_SOURCES = \
 	$(KERNEL_C) \
 	$(KERNEL_ASM)
-
-include $(top_srcdir)/config/CppCheck.am
 
