@@ -105,35 +105,43 @@ void zfs_zstd_cache_reap_now(void);
  * Unfortunately, bitfields make few promises about how they're arranged in
  * memory...
  *
+ * By way of example, if we were using version 1.4.5 and level 3, it'd be
+ * level = 0x03, version = 10405/0x0028A5, which gets broken into Vhigh = 0x00,
+ * Vmid = 0x28, Vlow = 0xA5. We include these positions below to help follow
+ * which data winds up where.
+ *
  * As a consequence, we wound up with little endian platforms with a layout
  * like this in memory:
  *
- *      32      24      16      8       0
+ *      0       8      16      24      32
  *      +-------+-------+-------+-------+
- *      | level |  v0   |  v1   |  v2   |
+ *      | Vlow  | Vmid  | Vhigh | level |
  *      +-------+-------+-------+-------+
+ *        =A5     =28     =00     =03
  *
  * ...and then, after being run through BE_32(), serializing this out to
  * disk:
  *
- *      32      24      16      8       0
+ *      0       8      16      24      32
  *      +-------+-------+-------+-------+
- *      |  v2   |  v1   |  v0   | level |
+ *      | level | Vhigh | Vmed  | Vlow  |
  *      +-------+-------+-------+-------+
+ *        =03     =00     =28     =A5
  *
  * while on big-endian systems, since BE_32() is a noop there, both in
  * memory and on disk, we wind up with:
  *
- *      32      24      16      8       0
+ *      0       8      16      24      32
  *      +-------+-------+-------+-------+
- *      | level |  v2   |  v1   |  v0   |
+ *      | Vhigh | Vmid  | Vlow  | level |
  *      +-------+-------+-------+-------+
+ *        =00     =28     =A5     =03
  *
- * (v0 is always 0 until version exceeds 6.55.35. v1 and v2 are the other
- * two bytes of the "version" data.)
+ * (Vhigh is always 0 until version exceeds 6.55.35. Vmid and Vlow are the
+ * other two bytes of the "version" data.)
  *
  * So now we use the BF32_SET macros to get consistent behavior (the
- * BSWAP_32(LE) encoding, since x86 currently rules the world) across
+ * ondisk LE encoding, since x86 currently rules the world) across
  * platforms, but the "get" behavior requires that we check each of the
  * bytes in the aforementioned former-bitfield for 0x00, and from there,
  * we can know which possible layout we're dealing with. (Only the two
