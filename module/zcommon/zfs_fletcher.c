@@ -187,7 +187,7 @@ static const fletcher_4_ops_t *fletcher_4_impls[] = {
 #if defined(__x86_64) && defined(HAVE_AVX512BW)
 	&fletcher_4_avx512bw_ops,
 #endif
-#if defined(__aarch64__) && !defined(__FreeBSD__)
+#if defined(__aarch64__) && !defined(__FreeBSD__) && !defined(__APPLE__)
 	&fletcher_4_aarch64_neon_ops,
 #endif
 };
@@ -889,7 +889,7 @@ zio_abd_checksum_func_t fletcher_4_abd_ops = {
 
 #define	IMPL_FMT(impl, i)	(((impl) == (i)) ? "[%s] " : "%s ")
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
 
 static int
 fletcher_4_param_get(char *buffer, zfs_kernel_param_t *unused)

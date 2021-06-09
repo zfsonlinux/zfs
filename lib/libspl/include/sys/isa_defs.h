@@ -128,15 +128,21 @@ extern "C" {
 /* arm arch specific defines */
 #elif defined(__arm) || defined(__arm__) || defined(__aarch64__)
 
+/* We can NOT define __arm / __arm__ on macOS, it is only for 32bit */
 #if !defined(__arm)
 #define	__arm
 #endif
 
+#ifndef __APPLE__
 #if !defined(__arm__)
 #define	__arm__
 #endif
+#endif
 
 #if defined(__aarch64__)
+#if !defined(__arm64)
+#define	__arm64
+#endif
 #if !defined(_LP64)
 #define	_LP64
 #endif

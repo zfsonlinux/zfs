@@ -1110,6 +1110,12 @@ dump_snapshot(zfs_handle_t *zhp, void *arg)
 	}
 
 	if (!sdd->dryrun) {
+
+#if defined(__APPLE__)
+		/* Can't do IO on pipes, possibly wrap fd in domain socket */
+		libzfs_macos_wrapfd(&sdd->outfd, B_TRUE);
+#endif
+
 		/*
 		 * If progress reporting is requested, spawn a new thread to
 		 * poll ZFS_IOC_SEND_PROGRESS at a regular interval.
@@ -1774,6 +1780,11 @@ zfs_send_resume_impl(libzfs_handle_t *hdl, sendflags_t *flags, int outfd,
 				return (error);
 			}
 		}
+
+#if defined(__APPLE__)
+		/* Can't do IO on pipes, possibly wrap fd in domain socket */
+		libzfs_macos_wrapfd(&outfd, B_TRUE);
+#endif
 
 		error = lzc_send_resume_redacted(zhp->zfs_name, fromname, outfd,
 		    lzc_flags, resumeobj, resumeoff, redact_book);
@@ -2486,6 +2497,11 @@ zfs_send_one(zfs_handle_t *zhp, const char *from, int fd, sendflags_t *flags,
 	if (flags->dryrun)
 		return (0);
 
+#if defined(__APPLE__)
+	/* Can't do IO on pipes, possibly wrap fd in domain socket */
+	libzfs_macos_wrapfd(&fd, B_TRUE);
+#endif
+
 	/*
 	 * If progress reporting is requested, spawn a new thread to poll
 	 * ZFS_IOC_SEND_PROGRESS at a regular interval.
@@ -2573,6 +2589,7 @@ zfs_send_one(zfs_handle_t *zhp, const char *from, int fd, sendflags_t *flags,
 			return (zfs_standard_error(hdl, errno, errbuf));
 		}
 	}
+
 	return (err != 0);
 }
 
@@ -4650,6 +4667,11 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		goto out;
 	}
 
+#if defined(__APPLE__)
+	/* Can't do IO on pipes, possibly wrap fd in domain socket */
+	libzfs_macos_wrapfd(&infd, B_FALSE);
+#endif
+
 	err = ioctl_err = lzc_receive_with_cmdprops(destsnap, rcvprops,
 	    oxprops, wkeydata, wkeylen, origin, flags->force, flags->resumable,
 	    raw, infd, drr_noswap, -1, &read_bytes, &errflags,
@@ -5021,6 +5043,11 @@ zfs_receive_impl(libzfs_handle_t *hdl, const char *tosnap,
 		    "(%s) does not exist"), originsnap);
 		return (zfs_error(hdl, EZFS_NOENT, errbuf));
 	}
+
+#if defined(__APPLE__)
+	/* Can't do IO on pipes, possibly wrap fd in domain socket */
+	libzfs_macos_wrapfd(&infd, B_FALSE);
+#endif
 
 	/* read in the BEGIN record */
 	if (0 != (err = recv_read(hdl, infd, &drr, sizeof (drr), B_FALSE,

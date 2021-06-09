@@ -1890,7 +1890,9 @@ zio_taskq_dispatch(zio_t *zio, zio_taskq_type_t q, boolean_t cutinline)
 	 * to a single taskq at a time.  It would be a grievous error
 	 * to dispatch the zio to another taskq at the same time.
 	 */
+#ifndef __APPLE__
 	ASSERT(taskq_empty_ent(&zio->io_tqent));
+#endif
 	spa_taskq_dispatch_ent(spa, t, q, (task_func_t *)zio_execute, zio,
 	    flags, &zio->io_tqent);
 }

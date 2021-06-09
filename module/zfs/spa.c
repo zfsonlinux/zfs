@@ -1307,7 +1307,7 @@ spa_activate(spa_t *spa, spa_mode_t mode)
 	    spa_error_entry_compare, sizeof (spa_error_entry_t),
 	    offsetof(spa_error_entry_t, se_avl));
 
-#if defined (_KERNEL) && defined (__APPLE__)
+#if defined(_KERNEL) && defined(__APPLE__)
 	spa_activate_os(spa);
 #endif
 
@@ -1448,7 +1448,7 @@ spa_deactivate(spa_t *spa)
 		spa->spa_did = 0;
 	}
 
-#if defined (_KERNEL) && defined (__APPLE__)
+#if defined(_KERNEL) && defined(__APPLE__)
 	spa_deactivate_os(spa);
 #endif
 
@@ -6016,7 +6016,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_minref = zfs_refcount_count(&spa->spa_refcount);
 	spa->spa_load_state = SPA_LOAD_NONE;
 
-#if defined (__APPLE__) && defined (_KERNEL)
+#if defined(__APPLE__) && defined(_KERNEL)
 	spa_create_os(spa);
 #endif
 
@@ -6203,11 +6203,11 @@ spa_import(char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 
 	mutex_exit(&spa_namespace_lock);
 
-	zvol_create_minors_recursive(pool);
-
-#if defined (__APPLE__) && defined (_KERNEL)
+#if defined(__APPLE__) && defined(_KERNEL)
 	spa_create_os(spa);
 #endif
+
+	zvol_create_minors_recursive(pool);
 
 	return (0);
 }
@@ -6440,7 +6440,7 @@ spa_export_common(const char *pool, int new_state, nvlist_t **oldconfig,
 	}
 
 export_spa:
-#if defined (__APPLE__) && defined (_KERNEL)
+#if defined(__APPLE__) && defined(_KERNEL)
 	spa_export_os(spa);
 #endif
 

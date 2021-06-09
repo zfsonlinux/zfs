@@ -7958,9 +7958,19 @@ arc_init(void)
 	    offsetof(arc_prune_t, p_node));
 	mutex_init(&arc_prune_mtx, NULL, MUTEX_DEFAULT, NULL);
 
+#ifdef __APPLE__
+#ifndef _KERNEL
+#define	TASKQ_REALLY_DYNAMIC 0x0
+#endif
+	arc_prune_taskq = taskq_create("arc_prune", 100, defclsyspri,
+	    boot_ncpus, INT_MAX, TASKQ_PREPOPULATE | TASKQ_DYNAMIC |
+	    TASKQ_REALLY_DYNAMIC |
+	    TASKQ_THREADS_CPU_PCT);
+#else
 	arc_prune_taskq = taskq_create("arc_prune", 100, defclsyspri,
 	    boot_ncpus, INT_MAX, TASKQ_PREPOPULATE | TASKQ_DYNAMIC |
 	    TASKQ_THREADS_CPU_PCT);
+#endif
 
 	arc_ksp = kstat_create("zfs", 0, "arcstats", "misc", KSTAT_TYPE_NAMED,
 	    sizeof (arc_stats) / sizeof (kstat_named_t), KSTAT_FLAG_VIRTUAL);
