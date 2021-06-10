@@ -130,7 +130,7 @@ SHELLCHECKSCRIPTS = autogen.sh
 
 PHONY += checkabi storeabi
 checkabi: lib
-	$(MAKE) -C lib checkabi
+	echo $(MAKE) -C lib checkabi
 
 storeabi: lib
 	$(MAKE) -C lib storeabi
