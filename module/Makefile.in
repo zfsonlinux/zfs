@@ -15,7 +15,7 @@ check:
 	clean clean-Linux clean-FreeBSD \
 	modules_install modules_install-Linux modules_install-FreeBSD \
 	modules_uninstall modules_uninstall-Linux modules_uninstall-FreeBSD \
-	cppcheck cppcheck-Linux cppcheck-FreeBSD
+	cppcheck cppcheck-Linux cppcheck-FreeBSD cppcheck-macOS
 
 # For FreeBSD, use debug options from ./configure if not overridden.
 export WITH_DEBUG ?= @WITH_DEBUG@
@@ -142,6 +142,9 @@ cppcheck-Linux:
 		avl icp lua nvpair spl unicode zcommon zfs zstd os/linux
 
 cppcheck-FreeBSD:
+	@true
+
+cppcheck-macOS:
 	@true
 
 cppcheck: cppcheck-@ac_system@
