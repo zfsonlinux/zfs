@@ -71,20 +71,17 @@ AC_DEFUN([ZFS_AC_META], [
 
 		ZFS_META_RELEASE=_ZFS_AC_META_GETVAL([Release]);
 		if test ! -f ".nogitrelease" && git rev-parse --git-dir > /dev/null 2>&1; then
-			_match="${ZFS_META_NAME}-${ZFS_META_VERSION}"
-			_alias=$(git describe --match=${_match} 2>/dev/null)
-			_release=$(echo ${_alias}|cut -f3- -d'-'|sed 's/-/_/g')
+			_git_rev=$(git rev-parse --short HEAD)
+			_tag=$(git describe --exact-match ${_git_rev} 2>/dev/null)
+			_release=$(echo ${_tag}|cut -f3- -d'-'|sed 's/-/_/g')
 			if test -n "${_release}"; then
 				ZFS_META_RELEASE=${_release}
 				_zfs_ac_meta_type="git describe"
 			else
-				_match="${ZFS_META_NAME}-${ZFS_META_VERSION}-${ZFS_META_RELEASE}"
-	                        _alias=$(git describe --match=${_match} 2>/dev/null)
-	                        _release=$(echo ${_alias}|cut -f3- -d'-'|sed 's/-/_/g')
-				if test -n "${_release}"; then
-					ZFS_META_RELEASE=${_release}
-					_zfs_ac_meta_type="git describe"
-				fi
+				_tag_info=$(git describe 2>/dev/null)
+				_release=$(echo ${_tag_info}|cut -f3- -d'-'|sed 's/-/_/g')
+				ZFS_META_RELEASE=${_release}
+				_zfs_ac_meta_type="git describe"
 			fi
 		fi
 
