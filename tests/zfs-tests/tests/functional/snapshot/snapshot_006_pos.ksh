@@ -119,7 +119,7 @@ log_must tar xf $TESTDIR1/tarball.snapshot.tar
 
 cd $CWD || log_fail "Could not cd $CWD"
 
-diff -q -r $TESTDIR1/original $TESTDIR1/snapshot > /dev/null 2>&1
+directory_diff $TESTDIR1/original $TESTDIR1/snapshot
 if [[ $? -eq 1 ]]; then
 	log_fail "Directory structures differ."
 fi

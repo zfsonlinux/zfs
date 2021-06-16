@@ -94,7 +94,7 @@ for i in 1 2 3; do
 done
 log_note "verify snapshot contents"
 for ds in $datasets; do
-	diff -q -r /$ds /$ds/.zfs/snapshot/snap > /dev/null 2>&1
+	directory_diff /$ds /$ds/.zfs/snapshot/snap
 	if [[ $? -eq 1 ]]; then
 		log_fail "snapshot contents are different from" \
 		    "the filesystem"
