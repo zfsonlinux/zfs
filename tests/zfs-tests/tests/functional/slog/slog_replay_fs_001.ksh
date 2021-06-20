@@ -202,7 +202,7 @@ fi
 # 4. Copy TESTFS to temporary location (TESTDIR/copy)
 #
 log_must mkdir -p $TESTDIR
-log_must rsync -aHAX /$TESTPOOL/$TESTFS $TESTDIR/copy
+log_must rsync -aHAX /$TESTPOOL/$TESTFS/ $TESTDIR/copy
 
 #
 # 5. Unmount filesystem and export the pool

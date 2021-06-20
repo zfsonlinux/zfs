@@ -4238,8 +4238,6 @@ function directory_diff # dir_a dir_b
 	diff="$(rsync -ni -acAHX --delete "$1/" "$2/")"
 	rv=0
 	if [ -n "$diff" ]; then
-		ls -laR "$1"
-		ls -laR "$2"
 		echo "$diff"
 		rv=1
 	fi
