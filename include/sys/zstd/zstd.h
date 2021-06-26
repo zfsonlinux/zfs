@@ -161,25 +161,25 @@ zfs_get_hdrmeta(const zfs_zstdhdr_t *blob, zfs_zstdmeta_t *res)
 			break;
 	}
 	switch (shift) {
-		case 0:
+	case 0:
 		res->level = BF32_GET(raw, 24, 8);
 		res->version = BSWAP_32(raw);
 		res->version = BF32_GET(res->version, 8, 24);
 		break;
-		case 1:
+	case 1:
 		res->level = BF32_GET(raw, 0, 8);
 		res->version = BSWAP_32(raw);
 		res->version = BF32_GET(res->version, 0, 24);
 		break;
-		case 2:
+	case 2:
 		res->level = BF32_GET(raw, 24, 8);
 		res->version = BF32_GET(raw, 0, 24);
 		break;
-		case 3:
+	case 3:
 		res->level = BF32_GET(raw, 0, 8);
 		res->version = BF32_GET(raw, 8, 24);
 		break;
-		default:
+	default:
 		res->level = 0;
 		res->version = 0;
 		break;
