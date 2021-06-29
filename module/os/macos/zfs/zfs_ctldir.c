@@ -1450,6 +1450,8 @@ zfsctl_snapshot_unmount_node(struct vnode *vp, const char *full_name,
 				list_remove(&zfsctl_mounts_list, zcm);
 				mutex_exit(&zfsctl_mounts_lock);
 
+				mutex_destroy(&zcm->zcm_lock);
+				cv_destroy(&zcm->zcm_cv);
 				kmem_free(zcm,
 				    sizeof (zfsctl_mounts_waiting_t));
 

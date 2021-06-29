@@ -339,6 +339,7 @@ size_t	kmem_max_cached = KMEM_BIG_MAXBUF;	/* maximum kmem_alloc cache */
 // can be 0 or KMF_LITE
 // or KMF_DEADBEEF | KMF_REDZONE | KMF_CONTENTS
 // with or without KMF_AUDIT
+// int kmem_flags = KMF_DEADBEEF | KMF_REDZONE | KMF_CONTENTS | KMF_AUDIT;
 int kmem_flags = KMF_LITE;
 #else
 int kmem_flags = 0;
@@ -4372,7 +4373,6 @@ spl_free_reap_caches(void)
 	if (curtime - last_reap < reap_after)
 		return;
 
-	vmem_qcache_reap(abd_arena);
 	kmem_reap();
 	vmem_qcache_reap(kmem_va_arena);
 }

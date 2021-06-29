@@ -268,7 +268,7 @@ segkmem_abd_init()
 
 	abd_arena = vmem_create("abd_cache", NULL, 0,
 	    PAGESIZE, vmem_alloc, vmem_free, spl_heap_arena,
-	    131072, VM_SLEEP | VMC_NO_QCACHE | VM_BESTFIT);
+	    131072, VM_SLEEP | VMC_NO_QCACHE | VM_FIRSTFIT);
 
 	ASSERT(abd_arena != NULL);
 }
