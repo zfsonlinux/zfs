@@ -745,13 +745,22 @@ txg_wait_synced_tx(dsl_pool_t *dp, uint64_t txg, dmu_tx_t *tx,
 		 * data isn't going to be pushed.
 		 */
 		if (spa_suspended(dp->dp_spa)) {
+			if ((flags & TXG_WAIT_F_FORCE_EXPORT)) {
+				error = 0;
+				break;
+			}
 			if ((flags & TXG_WAIT_F_NOSUSPEND) ||
 			    spa_exiting_any(dp->dp_spa)) {
 				error = SET_ERROR(EAGAIN);
 			}
 		}
-		if (error == 0 && os != NULL && dmu_objset_exiting(os))
+		if (error == 0 && os != NULL && dmu_objset_exiting(os)) {
+			if ((flags & TXG_WAIT_F_FORCE_EXPORT)) {
+				error = 0;
+				break;
+			}
 			error = SET_ERROR(EAGAIN);
+		}
 		if (error != 0)
 			break;
 		if (flags & TXG_WAIT_F_SIGNAL) {

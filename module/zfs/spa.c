@@ -6584,8 +6584,8 @@ export_spa:
 		 * If the pool is not being hard forced, throw an error upon
 		 * suspension and abort.
 		 */
-		error = spa_unload(spa,
-		    hardforce ? TXG_WAIT_F_NONE : TXG_WAIT_F_NOSUSPEND);
+		error = spa_unload(spa, hardforce ?
+		    TXG_WAIT_F_FORCE_EXPORT : TXG_WAIT_F_NOSUSPEND);
 		if (error != 0)
 			goto fail;
 		spa_deactivate(spa);

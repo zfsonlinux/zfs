@@ -79,6 +79,8 @@ typedef enum {
 	TXG_WAIT_F_SIGNAL	= (1U << 0),
 	/* Reject the call with EAGAIN upon suspension. */
 	TXG_WAIT_F_NOSUSPEND	= (1U << 1),
+	/* Ignore errors and export anyway. */
+	TXG_WAIT_F_FORCE_EXPORT	= (1U << 2),
 } txg_wait_flag_t;
 
 extern void txg_init(struct dsl_pool *dp, uint64_t txg);
