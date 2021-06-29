@@ -1477,14 +1477,27 @@ vdev_raidz_min_asize(vdev_t *vd)
 	    vd->vdev_children);
 }
 
-void
+static void
 vdev_raidz_child_done(zio_t *zio)
 {
 	raidz_col_t *rc = zio->io_private;
 
+	ASSERT3P(rc->rc_abd, !=, NULL);
 	rc->rc_error = zio->io_error;
 	rc->rc_tried = 1;
 	rc->rc_skipped = 0;
+
+	/*
+	 * If we created a gang ABD to aggregate IO's for writes we will
+	 * free the gang ABD here and reset the column's ABD to the original
+	 * ABD.
+	 */
+	if (zio->io_type == ZIO_TYPE_WRITE && abd_is_gang(rc->rc_abd)) {
+		ASSERT3P(rc->rc_orig_data, !=, rc->rc_abd);
+		abd_free(rc->rc_abd);
+		rc->rc_abd = rc->rc_orig_data;
+		rc->rc_orig_data = NULL;
+	}
 }
 
 static void
@@ -1525,41 +1538,76 @@ vdev_raidz_io_start_write(zio_t *zio, raidz_row_t *rr, uint64_t ashift)
 {
 	vdev_t *vd = zio->io_vd;
 	raidz_map_t *rm = zio->io_vsd;
-	int c, i;
+	int c, skipped = 0, skip_first_cols = 0;
 
 	vdev_raidz_generate_parity_row(rm, rr);
 
-	for (int c = 0; c < rr->rr_cols; c++) {
+	if (rr->rr_scols < (rm->rm_skipstart + rm->rm_nskip)) {
+		skip_first_cols =
+		    (rm->rm_skipstart + rm->rm_nskip) % rr->rr_scols;
+	}
+
+	for (c = 0; c < rr->rr_scols; c++) {
+		abd_t *abd = NULL;
+		enum zio_flag flags = 0;
 		raidz_col_t *rc = &rr->rr_col[c];
-		if (rc->rc_size == 0)
-			continue;
+		vdev_t *cvd = vd->vdev_child[rc->rc_devidx];
 
 		/* Verify physical to logical translation */
 		vdev_raidz_io_verify(vd, rr, c);
 
-		zio_nowait(zio_vdev_child_io(zio, NULL,
-		    vd->vdev_child[rc->rc_devidx], rc->rc_offset,
-		    rc->rc_abd, rc->rc_size, zio->io_type, zio->io_priority,
-		    0, vdev_raidz_child_done, rc));
+		/*
+		 * Generate I/O for skip sectors to improve aggregation
+		 * contiguity. We will use gang ABD's to reduce contention
+		 * on the children VDEV queue locks (vq_lock) by issuing
+		 * a single I/O that contains the data and skip sectors.
+		 */
+		if (c < skip_first_cols || (c >= rm->rm_skipstart &&
+		    skipped < rm->rm_nskip)) {
+			skipped++;
+			if (rc->rc_size > 0) {
+				abd = abd_alloc_gang();
+				abd_gang_add(abd, rc->rc_abd, B_FALSE);
+				abd_gang_add(abd,
+				    abd_get_zeros(1ULL << ashift), B_TRUE);
+
+				/*
+				 * Store original ABD so the gang ABD can be
+				 * freed in vdev_raidz_child_done().
+				 *
+				 * Because rc_orig_data is only used for
+				 * reconstruction during reads, we can safely
+				 * stash the original raidz_col_t's ABD in it
+				 * for writes.
+				 */
+				ASSERT3P(rc->rc_orig_data, ==, NULL);
+				rc->rc_orig_data = rc->rc_abd;
+				rc->rc_abd = abd;
+			} else {
+				ASSERT3P(rc->rc_abd, ==, NULL);
+				zio_nowait(zio_vdev_child_io(zio, NULL, cvd,
+				    rc->rc_offset, NULL, 1ULL << ashift,
+				    zio->io_type, zio->io_priority,
+				    ZIO_FLAG_NODATA | ZIO_FLAG_OPTIONAL, NULL,
+				    NULL));
+				continue;
+			}
+
+		} else {
+			/*
+			 * I/O does not contain any skip sectors.
+			 */
+			abd = rc->rc_abd;
+		}
+
+		ASSERT3P(abd, !=, NULL);
+
+		zio_nowait(zio_vdev_child_io(zio, NULL, cvd, rc->rc_offset,
+		    abd, abd_get_size(abd), zio->io_type, zio->io_priority,
+		    flags, vdev_raidz_child_done, rc));
 	}
 
-	/*
-	 * Generate optional I/Os for skip sectors to improve aggregation
-	 * contiguity.
-	 */
-	for (c = rm->rm_skipstart, i = 0; i < rm->rm_nskip; c++, i++) {
-		ASSERT(c <= rr->rr_scols);
-		if (c == rr->rr_scols)
-			c = 0;
-
-		raidz_col_t *rc = &rr->rr_col[c];
-		vdev_t *cvd = vd->vdev_child[rc->rc_devidx];
-
-		zio_nowait(zio_vdev_child_io(zio, NULL, cvd,
-		    rc->rc_offset + rc->rc_size, NULL, 1ULL << ashift,
-		    zio->io_type, zio->io_priority,
-		    ZIO_FLAG_NODATA | ZIO_FLAG_OPTIONAL, NULL, NULL));
-	}
+	ASSERT3S(skipped, ==, rm->rm_nskip);
 }
 
 static void
