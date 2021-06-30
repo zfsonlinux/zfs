@@ -336,6 +336,18 @@ ATOMIC_SWAP(ulong, ulong_t)
 ATOMIC_SWAP(ushort, ushort_t)
 /* END CSTYLED */
 
+static inline uint64_t
+atomic_load_64(volatile uint64_t *target)
+{
+	return (__atomic_load_n(target, __ATOMIC_RELAXED));
+}
+
+static inline void
+atomic_store_64(volatile uint64_t *target, uint64_t bits)
+{
+	return (__atomic_store_n(target, bits, __ATOMIC_RELAXED));
+}
+
 static inline __attribute__((always_inline)) void
 membar_producer(void)
 {

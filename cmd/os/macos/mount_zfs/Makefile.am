@@ -5,6 +5,8 @@ FS_BUNDLEDIR = $(DESTDIR)$(FS_BUNDLEPREFIX)/zfs.fs
 
 sbin_PROGRAMS = mount_zfs
 
+AM_CPPFLAGS += -I$(top_srcdir)/lib/libzfs
+
 mount_zfs_SOURCES = \
 	mount_zfs.c
 

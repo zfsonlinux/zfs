@@ -359,7 +359,7 @@ arc_reclaim_thread(void *unused)
 				goto lock_and_sleep;
 			}
 		} else if (free_memory < (arc_c >> arc_no_grow_shift) &&
-		    aggsum_value(&arc_size) >
+		    aggsum_value(&arc_sums.arcstat_size) >
 		    arc_c_min + SPA_MAXBLOCKSIZE) {
 			// relatively low memory and arc is above arc_c_min
 			arc_no_grow = B_TRUE;
@@ -486,7 +486,8 @@ lock_and_sleep:
 		 * running another pass is unlikely to be helpful.
 		 */
 
-		if (aggsum_compare(&arc_size, arc_c) <= 0 || d_adj <= 0) {
+		if (aggsum_compare(&arc_sums.arcstat_size, arc_c) <= 0 ||
+		    d_adj <= 0) {
 			/*
 			 * We're either no longer overflowing, or we
 			 * can't evict anything more, so we should wake

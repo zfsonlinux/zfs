@@ -1,5 +1,5 @@
 #include <libintl.h>
-#include "libzfs_impl.h"
+#include "../../libzfs_impl.h"
 
 int
 zfs_destroy_snaps_nvl_os(libzfs_handle_t *hdl, nvlist_t *snaps)

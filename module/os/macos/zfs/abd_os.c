@@ -69,6 +69,15 @@ static abd_stats_t abd_stats = {
 	{ "linear_data_size",			KSTAT_DATA_UINT64 },
 };
 
+struct {
+	wmsum_t abdstat_struct_size;
+	wmsum_t abdstat_scatter_cnt;
+	wmsum_t abdstat_scatter_data_size;
+	wmsum_t abdstat_scatter_chunk_waste;
+	wmsum_t abdstat_linear_cnt;
+	wmsum_t abdstat_linear_data_size;
+} abd_sums;
+
 /*
  * The size of the chunks ABD allocates. Because the sizes allocated from the
  * kmem_cache can't change, this tunable can only be modified at boot. Changing

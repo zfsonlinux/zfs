@@ -45,4 +45,19 @@ random_get_pseudo_bytes(uint8_t *ptr, size_t len)
 	return (0);
 }
 
+static inline uint32_t
+random_in_range(uint32_t range)
+{
+	uint32_t r;
+
+	ASSERT(range != 0);
+
+	if (range == 1)
+		return (0);
+
+	read_random((void *)&r, sizeof (r));
+
+	return (r % range);
+}
+
 #endif	/* _SPL_RANDOM_H */

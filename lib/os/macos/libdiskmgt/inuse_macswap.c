@@ -31,9 +31,15 @@
 #include <sys/types.h>
 #include "disks_private.h"
 
-extern char *dirname(char *path);
-
 static const char *SWAP_SYSCTL_NAME = "vm.swapfileprefix";
+
+/* Return index of last slash or strlen if none */
+static ssize_t
+zfs_dirnamelen(const char *path)
+{
+	const char *end = strrchr(path, '/');
+	return (end ? end - path : strlen(path));
+}
 
 int
 inuse_macswap(const char *dev_name)
@@ -44,6 +50,7 @@ inuse_macswap(const char *dev_name)
 	char *swap_filename;
 	char real_swap_path[MAXPATHLEN];
 	char real_dev_path[MAXPATHLEN];
+	int idx;
 
 	/* Obtain the swap file prefix (path + prototype basename) */
 	if (sysctlbyname(SWAP_SYSCTL_NAME, NULL, &oldlen, NULL, 0) != 0)
@@ -59,15 +66,16 @@ inuse_macswap(const char *dev_name)
 	 * once links etc have been resolved.
 	 */
 	tmp = realpath(swap_filename, NULL);
-	tmp2 = dirname(swap_filename);
-	(void) strlcpy(real_swap_path, tmp2, MAXPATHLEN);
+	idx = zfs_dirnamelen(swap_filename);
+
+	(void) strlcpy(real_swap_path, swap_filename, idx);
 	free(swap_filename);
 	free(tmp);
 
 	/* Get the (resolved) directory portion of dev_name */
 	tmp = realpath(dev_name, NULL);
-	tmp2 = dirname(tmp);
-	(void) strlcpy(real_dev_path, tmp2, MAXPATHLEN);
+	idx = zfs_dirnamelen(tmp);
+	(void) strlcpy(real_dev_path, tmp, idx);
 	free(tmp);
 
 	/* If the strings are equal, the file is in the swap dir */

@@ -36,7 +36,7 @@
 #include <dirent.h>
 #include <sys/fcntl.h>
 #include <libzfs.h>
-#include <libzfs_impl.h>
+#include "../../libzfs_impl.h"
 #include <dlfcn.h>
 
 /*

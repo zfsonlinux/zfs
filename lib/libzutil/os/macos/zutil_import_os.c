@@ -92,7 +92,7 @@ zpool_default_import_path[DEFAULT_IMPORT_PATH_SIZE] = {
 };
 
 static boolean_t
-is_watchdog_dev(char *dev)
+is_watchdog_dev(const char *dev)
 {
 	/* For 'watchdog' dev */
 	if (strcmp(dev, "watchdog") == 0)
@@ -204,7 +204,8 @@ zpool_open_func(void *arg)
 	libpc_handle_t *hdl = rn->rn_hdl;
 	struct stat64 statbuf;
 	nvlist_t *config;
-	char *bname, *dupname;
+	const char *bname;
+	char *dupname;
 	uint64_t vdev_guid = 0;
 	int error;
 	int num_labels = 0;
@@ -218,7 +219,7 @@ zpool_open_func(void *arg)
 	 * watchdog - Watchdog must be closed in a special way.
 	 */
 	dupname = zutil_strdup(hdl, rn->rn_name);
-	bname = basename(dupname);
+	bname = zfs_basename(dupname);
 	error = ((strcmp(bname, "hpet") == 0) || is_watchdog_dev(bname));
 	if ((strncmp(bname, "core", 4) == 0) ||
 	    (strncmp(bname, "fd", 2) == 0) ||
