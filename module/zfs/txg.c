@@ -781,7 +781,7 @@ txg_wait_synced_tx(dsl_pool_t *dp, uint64_t txg, dmu_tx_t *tx,
 	}
 
 	mutex_exit(&dp_tx->tx_sync_lock);
-	dprintf("txg=%llu error=%d\n", txg, error);
+	dprintf("txg=%llu error=%d\n", (u_longlong_t)txg, error);
 	return (error);
 }
 
