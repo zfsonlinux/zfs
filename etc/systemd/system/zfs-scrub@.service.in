@@ -8,5 +8,9 @@ ConditionACPower=true
 ConditionPathIsDirectory=/sys/module/zfs
 
 [Service]
-Type=oneshot
-ExecStart=@sbindir@/zpool scrub %i
+Type=simple
+# FIXME: grep should be ExecCondition once systemd >= 243 is more widespread
+ExecStart=/bin/sh -c '\
+if { @sbindir@/zpool status %i | grep -q "scrub in progress" ;}; then\
+echo "scrub in progress, exiting";\
+else @sbindir@/zpool scrub -w %i; fi'
