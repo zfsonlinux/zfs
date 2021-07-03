@@ -4,8 +4,8 @@ Documentation=man:zpool-scrub(8)
 
 [Timer]
 OnCalendar=weekly
-AccuracySec=1h
 Persistent=true
+RandomizedDelaySec=1h
 Unit=zfs-scrub@%i.service
 
 [Install]
