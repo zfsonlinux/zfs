@@ -3,6 +3,7 @@ Description=zpool scrub on %i
 Documentation=man:zpool-scrub(8)
 Requires=zfs.target
 After=zfs.target
+ConditionACPower=true
 ConditionPathIsDirectory=/sys/module/zfs
 
 [Service]
