@@ -147,7 +147,6 @@ kcf_prov_tab_rem_provider(crypto_provider_id_t prov_id)
 	kcf_provider_desc_t *prov_desc;
 
 	ASSERT(prov_tab != NULL);
-	ASSERT(prov_tab_num >= 0);
 
 	/*
 	 * Validate provider id, since it can be specified by a 3rd-party
@@ -377,7 +376,7 @@ kcf_provider_zero_refcnt(kcf_provider_desc_t *desc)
 			mutex_exit(&desc->pd_lock);
 			break;
 		}
-		/* FALLTHRU */
+		/* FALLTHROUGH */
 
 	case CRYPTO_HW_PROVIDER:
 	case CRYPTO_LOGICAL_PROVIDER:

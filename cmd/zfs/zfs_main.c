@@ -414,10 +414,9 @@ get_usage(zfs_help_t idx)
 		return (gettext("\tunjail <jailid|jailname> <filesystem>\n"));
 	case HELP_WAIT:
 		return (gettext("\twait [-t <activity>] <filesystem>\n"));
+	default:
+		__builtin_unreachable();
 	}
-
-	abort();
-	/* NOTREACHED */
 }
 
 void
@@ -751,6 +750,9 @@ note_dev_error(int err, int fd)
 		    "(As a workaround, "
 		    "try \"zfs send [...] | cat > /dev/null\")\n"));
 	}
+#else
+	(void) err;
+	(void) fd;
 #endif
 }
 
@@ -3761,7 +3763,6 @@ zfs_do_list(int argc, char **argv)
  * The '-p' flag creates all the non-existing ancestors of the target first.
  * The '-u' flag prevents file systems from being remounted during rename.
  */
-/* ARGSUSED */
 static int
 zfs_do_rename(int argc, char **argv)
 {
@@ -3860,7 +3861,6 @@ zfs_do_rename(int argc, char **argv)
  *
  * Promotes the given clone fs to be the parent
  */
-/* ARGSUSED */
 static int
 zfs_do_promote(int argc, char **argv)
 {
@@ -4511,7 +4511,6 @@ zfs_do_send(int argc, char **argv)
 			usage(B_FALSE);
 			break;
 		case '?':
-			/*FALLTHROUGH*/
 		default:
 			/*
 			 * If an invalid flag was passed, optopt contains the
@@ -5097,10 +5096,11 @@ who_type2weight(zfs_deleg_who_type_t who_type)
 	return (res);
 }
 
-/* ARGSUSED */
 static int
 who_perm_compare(const void *larg, const void *rarg, void *unused)
 {
+	(void) unused;
+
 	const who_perm_node_t *l = larg;
 	const who_perm_node_t *r = rarg;
 	zfs_deleg_who_type_t ltype = l->who_perm.who_type;
@@ -5120,10 +5120,11 @@ who_perm_compare(const void *larg, const void *rarg, void *unused)
 		return (-1);
 }
 
-/* ARGSUSED */
 static int
 deleg_perm_compare(const void *larg, const void *rarg, void *unused)
 {
+	(void) unused;
+
 	const deleg_perm_node_t *l = larg;
 	const deleg_perm_node_t *r = rarg;
 	int res =  strncmp(l->dpn_perm.dp_name, r->dpn_perm.dp_name,
@@ -7212,10 +7213,11 @@ typedef struct unshare_unmount_node {
 	uu_avl_node_t	un_avlnode;
 } unshare_unmount_node_t;
 
-/* ARGSUSED */
 static int
 unshare_unmount_compare(const void *larg, const void *rarg, void *unused)
 {
+	(void) unused;
+
 	const unshare_unmount_node_t *l = larg;
 	const unshare_unmount_node_t *r = rarg;
 
@@ -8611,6 +8613,9 @@ zfs_do_wait(int argc, char **argv)
 static int
 zfs_do_version(int argc, char **argv)
 {
+	(void) argc;
+	(void) argv;
+
 	if (zfs_version_print() == -1)
 		return (1);
 
@@ -8735,7 +8740,6 @@ main(int argc, char **argv)
 /*
  * Attach/detach the given dataset to/from the given jail
  */
-/* ARGSUSED */
 static int
 zfs_do_jail_impl(int argc, char **argv, boolean_t attach)
 {
@@ -8773,7 +8777,6 @@ zfs_do_jail_impl(int argc, char **argv, boolean_t attach)
  *
  * Attach the given dataset to the given jail
  */
-/* ARGSUSED */
 static int
 zfs_do_jail(int argc, char **argv)
 {
@@ -8785,7 +8788,6 @@ zfs_do_jail(int argc, char **argv)
  *
  * Detach the given dataset from the given jail
  */
-/* ARGSUSED */
 static int
 zfs_do_unjail(int argc, char **argv)
 {

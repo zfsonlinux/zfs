@@ -607,14 +607,17 @@ extern dnode_stats_t dnode_stats;
 	dprintf_ds((dn)->dn_objset->os_dsl_dataset, "obj=%s " fmt, \
 	    __db_buf, __VA_ARGS__); \
 	} \
-_NOTE(CONSTCOND) } while (0)
+} while (0)
 
 #define	DNODE_VERIFY(dn)		dnode_verify(dn)
 #define	FREE_VERIFY(db, start, end, tx)	free_verify(db, start, end, tx)
 
 #else
 
-#define	dprintf_dnode(db, fmt, ...)
+extern int _not_dprintf_dnode(struct dnode *, const char *, ...)
+    __attribute__((format(printf, 2, 3)));
+#define	dprintf_dnode(dn, fmt, ...)	\
+	((void)sizeof (_not_dprintf_dnode(dn, fmt, __VA_ARGS__)))
 #define	DNODE_VERIFY(dn)
 #define	FREE_VERIFY(db, start, end, tx)
 

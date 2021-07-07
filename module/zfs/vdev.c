@@ -137,7 +137,6 @@ int zfs_nocacheflush = 0;
 uint64_t zfs_vdev_max_auto_ashift = ASHIFT_MAX;
 uint64_t zfs_vdev_min_auto_ashift = ASHIFT_MIN;
 
-/*PRINTFLIKE2*/
 void
 vdev_dbgmsg(vdev_t *vd, const char *fmt, ...)
 {
@@ -262,11 +261,13 @@ vdev_get_mg(vdev_t *vd, metaslab_class_t *mc)
 		return (vd->vdev_mg);
 }
 
-/* ARGSUSED */
 void
 vdev_default_xlate(vdev_t *vd, const range_seg64_t *logical_rs,
     range_seg64_t *physical_rs, range_seg64_t *remain_rs)
 {
+	(void) vd;
+	(void) remain_rs;
+
 	physical_rs->rs_start = logical_rs->rs_start;
 	physical_rs->rs_end = logical_rs->rs_end;
 }
@@ -1768,6 +1769,7 @@ vdev_uses_zvols(vdev_t *vd)
 static boolean_t
 vdev_default_open_children_func(vdev_t *vd)
 {
+	(void) vd;
 	return (B_TRUE);
 }
 
@@ -2825,6 +2827,9 @@ boolean_t
 vdev_default_need_resilver(vdev_t *vd, const dva_t *dva, size_t psize,
     uint64_t phys_birth)
 {
+	(void) dva;
+	(void) psize;
+
 	/* Set by sequential resilver. */
 	if (phys_birth == TXG_UNKNOWN)
 		return (B_TRUE);
@@ -3457,7 +3462,8 @@ vdev_load(vdev_t *vd)
 			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
 			    VDEV_AUX_CORRUPT_DATA);
 			vdev_dbgmsg(vd, "vdev_load: zap_lookup(top_zap=%llu) "
-			    "failed [error=%d]", vd->vdev_top_zap, error);
+			    "failed [error=%d]",
+			    (u_longlong_t)vd->vdev_top_zap, error);
 			return (error);
 		}
 	}
@@ -4267,6 +4273,8 @@ vdev_get_child_stat(vdev_t *cvd, vdev_stat_t *vs, vdev_stat_t *cvs)
 static void
 vdev_get_child_stat_ex(vdev_t *cvd, vdev_stat_ex_t *vsx, vdev_stat_ex_t *cvsx)
 {
+	(void) cvd;
+
 	int t, b;
 	for (t = 0; t < ZIO_TYPES; t++) {
 		for (b = 0; b < ARRAY_SIZE(vsx->vsx_disk_histo[0]); b++)
@@ -4703,6 +4711,8 @@ void
 vdev_space_update(vdev_t *vd, int64_t alloc_delta, int64_t defer_delta,
     int64_t space_delta)
 {
+	(void) defer_delta;
+
 	int64_t dspace_delta;
 	spa_t *spa = vd->vdev_spa;
 	vdev_t *rvd = spa->spa_root_vdev;

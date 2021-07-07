@@ -48,6 +48,8 @@
 #include <sys/cred.h>
 #include <sys/zpl.h>
 
+#pragma GCC diagnostic error "-Wunused-parameter"
+
 /*
  * NB: FreeBSD expects to be able to do vnode locking in lookup and
  * hold the locks across all subsequent VOPs until vput is called.
@@ -80,10 +82,12 @@ zfs_init_vattr(vattr_t *vap, uint64_t mask, uint64_t mode,
 	vap->va_nodeid = nodeid;
 }
 
-/* ARGSUSED */
 static int
 zfs_replay_error(void *arg1, void *arg2, boolean_t byteswap)
 {
+	(void) arg1;
+	(void) arg2;
+	(void) byteswap;
 	return (SET_ERROR(ENOTSUP));
 }
 
@@ -362,7 +366,7 @@ zfs_replay_create_acl(void *arg1, void *arg2, boolean_t byteswap)
 		zfsvfs->z_fuid_replay = zfs_replay_fuids(fuidstart,
 		    (void *)&name, lracl->lr_fuidcnt, lracl->lr_domcnt,
 		    lr->lr_uid, lr->lr_gid);
-		/*FALLTHROUGH*/
+		/* FALLTHROUGH */
 	case TX_CREATE_ACL_ATTR:
 		if (name == NULL) {
 			lrattr = (lr_attr_t *)(caddr_t)(lracl + 1);
@@ -394,7 +398,7 @@ zfs_replay_create_acl(void *arg1, void *arg2, boolean_t byteswap)
 		zfsvfs->z_fuid_replay = zfs_replay_fuids(fuidstart,
 		    (void *)&name, lracl->lr_fuidcnt, lracl->lr_domcnt,
 		    lr->lr_uid, lr->lr_gid);
-		/*FALLTHROUGH*/
+		/* FALLTHROUGH */
 	case TX_MKDIR_ACL_ATTR:
 		if (name == NULL) {
 			lrattr = (lr_attr_t *)(caddr_t)(lracl + 1);
@@ -519,8 +523,8 @@ zfs_replay_create(void *arg1, void *arg2, boolean_t byteswap)
 		    zfs_replay_fuid_domain(start, &start,
 		    lr->lr_uid, lr->lr_gid);
 		name = (char *)start;
+		/* FALLTHROUGH */
 
-		/*FALLTHROUGH*/
 	case TX_CREATE:
 		if (name == NULL)
 			name = (char *)start;
@@ -537,8 +541,8 @@ zfs_replay_create(void *arg1, void *arg2, boolean_t byteswap)
 		    zfs_replay_fuid_domain(start, &start,
 		    lr->lr_uid, lr->lr_gid);
 		name = (char *)start;
+		/* FALLTHROUGH */
 
-		/*FALLTHROUGH*/
 	case TX_MKDIR:
 		if (name == NULL)
 			name = (char *)(lr + 1);

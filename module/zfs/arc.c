@@ -311,6 +311,8 @@
 #include <sys/zfs_racct.h>
 #include <sys/zstd/zstd.h>
 
+#pragma GCC diagnostic error "-Wunused-parameter"
+
 #ifndef _KERNEL
 /* set with ZFS_DEBUG=watch, to enable watchpoints on frozen buffers */
 boolean_t arc_watch = B_FALSE;
@@ -644,7 +646,6 @@ arc_sums_t arc_sums;
 		x = x - x / ARCSTAT_F_AVG_FACTOR + \
 		    (value) / ARCSTAT_F_AVG_FACTOR; \
 		ARCSTAT(stat) = x; \
-		_NOTE(CONSTCOND) \
 	} while (0)
 
 kstat_t			*arc_ksp;
@@ -1091,7 +1092,7 @@ buf_fini(void)
 #if defined(_KERNEL)
 	/*
 	 * Large allocations which do not require contiguous pages
-	 * should be using vmem_free() in the linux kernel\
+	 * should be using vmem_free() in the linux kernel
 	 */
 	vmem_free(buf_hash_table.ht_table,
 	    (buf_hash_table.ht_mask + 1) * sizeof (void *));
@@ -1111,10 +1112,12 @@ buf_fini(void)
  * Constructor callback - called when the cache is empty
  * and a new buf is requested.
  */
-/* ARGSUSED */
 static int
 hdr_full_cons(void *vbuf, void *unused, int kmflag)
 {
+	(void) unused;
+	(void) kmflag;
+
 	arc_buf_hdr_t *hdr = vbuf;
 
 	bzero(hdr, HDR_FULL_SIZE);
@@ -1130,10 +1133,11 @@ hdr_full_cons(void *vbuf, void *unused, int kmflag)
 	return (0);
 }
 
-/* ARGSUSED */
 static int
 hdr_full_crypt_cons(void *vbuf, void *unused, int kmflag)
 {
+	(void) unused;
+
 	arc_buf_hdr_t *hdr = vbuf;
 
 	hdr_full_cons(vbuf, unused, kmflag);
@@ -1143,10 +1147,11 @@ hdr_full_crypt_cons(void *vbuf, void *unused, int kmflag)
 	return (0);
 }
 
-/* ARGSUSED */
 static int
 hdr_l2only_cons(void *vbuf, void *unused, int kmflag)
 {
+	(void) unused;
+	(void) kmflag;
 	arc_buf_hdr_t *hdr = vbuf;
 
 	bzero(hdr, HDR_L2ONLY_SIZE);
@@ -1155,10 +1160,11 @@ hdr_l2only_cons(void *vbuf, void *unused, int kmflag)
 	return (0);
 }
 
-/* ARGSUSED */
 static int
 buf_cons(void *vbuf, void *unused, int kmflag)
 {
+	(void) unused;
+	(void) kmflag;
 	arc_buf_t *buf = vbuf;
 
 	bzero(buf, sizeof (arc_buf_t));
@@ -1172,10 +1178,10 @@ buf_cons(void *vbuf, void *unused, int kmflag)
  * Destructor callback - called when a cached buf is
  * no longer required.
  */
-/* ARGSUSED */
 static void
 hdr_full_dest(void *vbuf, void *unused)
 {
+	(void) unused;
 	arc_buf_hdr_t *hdr = vbuf;
 
 	ASSERT(HDR_EMPTY(hdr));
@@ -1186,30 +1192,30 @@ hdr_full_dest(void *vbuf, void *unused)
 	arc_space_return(HDR_FULL_SIZE, ARC_SPACE_HDRS);
 }
 
-/* ARGSUSED */
 static void
 hdr_full_crypt_dest(void *vbuf, void *unused)
 {
+	(void) unused;
 	arc_buf_hdr_t *hdr = vbuf;
 
 	hdr_full_dest(vbuf, unused);
 	arc_space_return(sizeof (hdr->b_crypt_hdr), ARC_SPACE_HDRS);
 }
 
-/* ARGSUSED */
 static void
 hdr_l2only_dest(void *vbuf, void *unused)
 {
-	arc_buf_hdr_t *hdr __maybe_unused = vbuf;
+	(void) unused;
+	arc_buf_hdr_t *hdr = vbuf;
 
 	ASSERT(HDR_EMPTY(hdr));
 	arc_space_return(HDR_L2ONLY_SIZE, ARC_SPACE_L2HDRS);
 }
 
-/* ARGSUSED */
 static void
 buf_dest(void *vbuf, void *unused)
 {
+	(void) unused;
 	arc_buf_t *buf = vbuf;
 
 	mutex_destroy(&buf->b_evict_lock);
@@ -1505,11 +1511,13 @@ arc_cksum_compute(arc_buf_t *buf)
 void
 arc_buf_sigsegv(int sig, siginfo_t *si, void *unused)
 {
-	panic("Got SIGSEGV at address: 0x%lx\n", (long)si->si_addr);
+	(void) sig;
+	(void) unused;
+	panic("Got SIGSEGV at address: 0x%llx\n",
+	    (u_longlong_t)(uintptr_t)si->si_addr);
 }
 #endif
 
-/* ARGSUSED */
 static void
 arc_buf_unwatch(arc_buf_t *buf)
 {
@@ -1518,10 +1526,11 @@ arc_buf_unwatch(arc_buf_t *buf)
 		ASSERT0(mprotect(buf->b_data, arc_buf_size(buf),
 		    PROT_READ | PROT_WRITE));
 	}
+#else
+	(void) buf;
 #endif
 }
 
-/* ARGSUSED */
 static void
 arc_buf_watch(arc_buf_t *buf)
 {
@@ -1529,6 +1538,8 @@ arc_buf_watch(arc_buf_t *buf)
 	if (arc_watch)
 		ASSERT0(mprotect(buf->b_data, arc_buf_size(buf),
 		    PROT_READ));
+#else
+	(void) buf;
 #endif
 }
 
@@ -1941,6 +1952,8 @@ error:
 static void
 arc_buf_untransform_in_place(arc_buf_t *buf, kmutex_t *hash_lock)
 {
+	(void) hash_lock;
+
 	arc_buf_hdr_t *hdr = buf->b_hdr;
 
 	ASSERT(HDR_ENCRYPTED(hdr));
@@ -2323,14 +2336,10 @@ remove_reference(arc_buf_hdr_t *hdr, kmutex_t *hash_lock, void *tag)
 }
 
 /*
- * Returns detailed information about a specific arc buffer.  When the
- * state_index argument is set the function will calculate the arc header
- * list position for its arc state.  Since this requires a linear traversal
- * callers are strongly encourage not to do this.  However, it can be helpful
- * for targeted analysis so the functionality is provided.
+ * Returns detailed information about a specific arc buffer.
  */
 void
-arc_buf_info(arc_buf_t *ab, arc_buf_info_t *abi, int state_index)
+arc_buf_info(arc_buf_t *ab, arc_buf_info_t *abi)
 {
 	arc_buf_hdr_t *hdr = ab->b_hdr;
 	l1arc_buf_hdr_t *l1hdr = NULL;
@@ -4825,10 +4834,12 @@ arc_kmem_reap_soon(void)
 	abd_cache_reap_now();
 }
 
-/* ARGSUSED */
 static boolean_t
 arc_evict_cb_check(void *arg, zthr_t *zthr)
 {
+	(void) arg;
+	(void) zthr;
+
 #ifdef ZFS_DEBUG
 	/*
 	 * This is necessary in order to keep the kstat information
@@ -4868,10 +4879,12 @@ arc_evict_cb_check(void *arg, zthr_t *zthr)
  * Keep arc_size under arc_c by running arc_evict which evicts data
  * from the ARC.
  */
-/* ARGSUSED */
 static void
 arc_evict_cb(void *arg, zthr_t *zthr)
 {
+	(void) arg;
+	(void) zthr;
+
 	uint64_t evicted = 0;
 	fstrans_cookie_t cookie = spl_fstrans_mark();
 
@@ -4908,10 +4921,12 @@ arc_evict_cb(void *arg, zthr_t *zthr)
 	spl_fstrans_unmark(cookie);
 }
 
-/* ARGSUSED */
 static boolean_t
 arc_reap_cb_check(void *arg, zthr_t *zthr)
 {
+	(void) arg;
+	(void) zthr;
+
 	int64_t free_memory = arc_available_memory();
 	static int reap_cb_check_counter = 0;
 
@@ -4955,10 +4970,12 @@ arc_reap_cb_check(void *arg, zthr_t *zthr)
  * target size of the cache (arc_c), causing the arc_evict_cb()
  * to free more buffers.
  */
-/* ARGSUSED */
 static void
 arc_reap_cb(void *arg, zthr_t *zthr)
 {
+	(void) arg;
+	(void) zthr;
+
 	int64_t free_memory;
 	fstrans_cookie_t cookie = spl_fstrans_mark();
 
@@ -5042,7 +5059,6 @@ arc_reap_cb(void *arg, zthr_t *zthr)
  *         already below arc_c_min, evicting any more would only
  *         increase this negative difference.
  */
-
 #endif /* _KERNEL */
 
 /*
@@ -5561,11 +5577,14 @@ arc_buf_access(arc_buf_t *buf)
 }
 
 /* a generic arc_read_done_func_t which you can use */
-/* ARGSUSED */
 void
 arc_bcopy_func(zio_t *zio, const zbookmark_phys_t *zb, const blkptr_t *bp,
     arc_buf_t *buf, void *arg)
 {
+	(void) zio;
+	(void) zb;
+	(void) bp;
+
 	if (buf == NULL)
 		return;
 
@@ -5574,11 +5593,13 @@ arc_bcopy_func(zio_t *zio, const zbookmark_phys_t *zb, const blkptr_t *bp,
 }
 
 /* a generic arc_read_done_func_t */
-/* ARGSUSED */
 void
 arc_getbuf_func(zio_t *zio, const zbookmark_phys_t *zb, const blkptr_t *bp,
     arc_buf_t *buf, void *arg)
 {
+	(void) zb;
+	(void) bp;
+
 	arc_buf_t **bufp = arg;
 
 	if (buf == NULL) {
@@ -7452,7 +7473,7 @@ arc_state_multilist_index_func(multilist_t *ml, void *obj)
 	if ((do_warn) && (tuning) && ((tuning) != (value))) {	\
 		cmn_err(CE_WARN,				\
 		    "ignoring tunable %s (using %llu instead)",	\
-		    (#tuning), (value));			\
+		    (#tuning), (u_longlong_t)(value));	\
 	}							\
 } while (0)
 
@@ -8332,8 +8353,8 @@ l2arc_write_size(l2arc_dev_t *dev)
 		    "plus the overhead of log blocks (persistent L2ARC, "
 		    "%llu bytes) exceeds the size of the cache device "
 		    "(guid %llu), resetting them to the default (%d)",
-		    l2arc_log_blk_overhead(size, dev),
-		    dev->l2ad_vdev->vdev_guid, L2ARC_WRITE_SIZE);
+		    (u_longlong_t)l2arc_log_blk_overhead(size, dev),
+		    (u_longlong_t)dev->l2ad_vdev->vdev_guid, L2ARC_WRITE_SIZE);
 		size = l2arc_write_max = l2arc_write_boost = L2ARC_WRITE_SIZE;
 
 		if (arc_warm == B_FALSE)
@@ -9604,10 +9625,11 @@ l2arc_hdr_limit_reached(void)
  * This thread feeds the L2ARC at regular intervals.  This is the beating
  * heart of the L2ARC.
  */
-/* ARGSUSED */
 static void
 l2arc_feed_thread(void *unused)
 {
+	(void) unused;
+
 	callb_cpr_t cpr;
 	l2arc_dev_t *dev;
 	spa_t *spa;
@@ -10284,8 +10306,8 @@ l2arc_dev_hdr_read(l2arc_dev_t *dev)
 	if (err != 0) {
 		ARCSTAT_BUMP(arcstat_l2_rebuild_abort_dh_errors);
 		zfs_dbgmsg("L2ARC IO error (%d) while reading device header, "
-		    "vdev guid: %llu", err,
-		    (u_longlong_t)dev->l2ad_vdev->vdev_guid);
+		    "vdev guid: %llu",
+		    err, (u_longlong_t)dev->l2ad_vdev->vdev_guid);
 		return (err);
 	}
 
@@ -10382,7 +10404,8 @@ l2arc_log_blk_read(l2arc_dev_t *dev,
 	if ((err = zio_wait(this_io)) != 0) {
 		ARCSTAT_BUMP(arcstat_l2_rebuild_abort_io_errors);
 		zfs_dbgmsg("L2ARC IO error (%d) while reading log block, "
-		    "offset: %llu, vdev guid: %llu", err,
+		    "offset: %llu, vdev guid: %llu",
+		    err,
 		    (u_longlong_t)this_lbp->lbp_daddr,
 		    (u_longlong_t)dev->l2ad_vdev->vdev_guid);
 		goto cleanup;
@@ -10655,8 +10678,8 @@ l2arc_dev_hdr_update(l2arc_dev_t *dev)
 
 	if (err != 0) {
 		zfs_dbgmsg("L2ARC IO error (%d) while writing device header, "
-		    "vdev guid: %llu", err,
-		    (u_longlong_t)dev->l2ad_vdev->vdev_guid);
+		    "vdev guid: %llu",
+		    err, (u_longlong_t)dev->l2ad_vdev->vdev_guid);
 	}
 }
 
@@ -10715,7 +10738,6 @@ l2arc_log_blk_commit(l2arc_dev_t *dev, zio_t *pio, l2arc_write_callback_t *cb)
 	    dev->l2ad_log_blk_payload_asize;
 	l2dhdr->dh_start_lbps[0].lbp_payload_start =
 	    dev->l2ad_log_blk_payload_start;
-	_NOTE(CONSTCOND)
 	L2BLK_SET_LSIZE(
 	    (&l2dhdr->dh_start_lbps[0])->lbp_prop, sizeof (*lb));
 	L2BLK_SET_PSIZE(

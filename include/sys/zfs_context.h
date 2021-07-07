@@ -41,7 +41,6 @@ extern "C" {
  * similar environment.
  */
 #if defined(__KERNEL__) || defined(_STANDALONE)
-#include <sys/note.h>
 #include <sys/types.h>
 #include <sys/atomic.h>
 #include <sys/sysmacros.h>
@@ -104,7 +103,6 @@ extern "C" {
 #include <ctype.h>
 #include <signal.h>
 #include <sys/mman.h>
-#include <sys/note.h>
 #include <sys/types.h>
 #include <sys/cred.h>
 #include <sys/sysmacros.h>
@@ -225,11 +223,13 @@ typedef pthread_t	kthread_t;
 #define	kpreempt(x)	yield()
 #define	getcomm()	"unknown"
 
-#define	thread_create_named(name, stk, stksize, func, arg, len, \
-    pp, state, pri)	\
-	zk_thread_create(func, arg, stksize, state)
+extern int _not_thread_create(int _, ...);
+#define	thread_create_named(name, stk, stksize, func, arg, len, pp, state, pri)\
+	((void)sizeof (_not_thread_create(0, name, stk, len, pp, pri)),	\
+	    zk_thread_create(func, arg, stksize, state))
 #define	thread_create(stk, stksize, func, arg, len, pp, state, pri)	\
-	zk_thread_create(func, arg, stksize, state)
+	((void)sizeof (_not_thread_create(0, stk, len, pp, pri)),	\
+	    zk_thread_create(func, arg, stksize, state))
 #define	thread_exit()	pthread_exit(NULL)
 #define	thread_join(t)	pthread_join((pthread_t)(t), NULL)
 
