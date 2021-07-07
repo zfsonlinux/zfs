@@ -1,0 +1,16 @@
+[Unit]
+Description=zpool scrub on %i
+Documentation=man:zpool-scrub(8)
+DefaultDependencies=no
+Requires=zfs.target
+After=zfs.target
+ConditionACPower=true
+ConditionPathIsDirectory=/sys/module/zfs
+
+[Service]
+Type=simple
+# FIXME: grep should be ExecCondition once systemd >= 243 is more widespread
+ExecStart=/bin/sh -c '\
+if { @sbindir@/zpool status %i | grep -q "scrub in progress" ;}; then\
+echo "scrub in progress, exiting";\
+else @sbindir@/zpool scrub -w %i; fi'
