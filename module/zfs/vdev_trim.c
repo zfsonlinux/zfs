@@ -183,6 +183,25 @@ vdev_autotrim_should_stop(vdev_t *tvd)
 }
 
 /*
+ * Wait for given number of kicks, return true if the wait is aborted due to
+ * vdev_autotrim_exit_wanted.
+ */
+static boolean_t
+vdev_autotrim_wait_kick(vdev_t *vd, int num_of_kick)
+{
+	int i;
+	mutex_enter(&vd->vdev_autotrim_lock);
+	for (i = 0; i < num_of_kick; i++) {
+		if (vd->vdev_autotrim_exit_wanted)
+			break;
+		cv_wait(&vd->vdev_autotrim_kick_cv, &vd->vdev_autotrim_lock);
+	}
+	mutex_exit(&vd->vdev_autotrim_lock);
+
+	return (i < num_of_kick);
+}
+
+/*
  * The sync task for updating the on-disk state of a manual TRIM.  This
  * is scheduled by vdev_trim_change_state().
  */
@@ -1192,7 +1211,6 @@ vdev_autotrim_thread(void *arg)
 
 	while (!vdev_autotrim_should_stop(vd)) {
 		int txgs_per_trim = MAX(zfs_trim_txg_batch, 1);
-		boolean_t issued_trim = B_FALSE;
 
 		/*
 		 * All of the metaslabs are divided in to groups of size
@@ -1224,6 +1242,8 @@ vdev_autotrim_thread(void *arg)
 		    i += txgs_per_trim) {
 			metaslab_t *msp = vd->vdev_ms[i];
 			range_tree_t *trim_tree;
+			boolean_t issued_trim = B_FALSE;
+			boolean_t metaslab_sync = B_FALSE;
 
 			spa_config_exit(spa, SCL_CONFIG, FTAG);
 			metaslab_disable(msp);
@@ -1374,7 +1394,18 @@ vdev_autotrim_thread(void *arg)
 			range_tree_vacate(trim_tree, NULL, NULL);
 			range_tree_destroy(trim_tree);
 
-			metaslab_enable(msp, issued_trim, B_FALSE);
+			/*
+			 * Wait for couples of kicks, to ensure the trim io is
+			 * synced. If the wait is aborted due to
+			 * vdev_autotrim_exit_wanted, we need to signal
+			 * metaslab_enable() to wait for sync.
+			 */
+			if (issued_trim) {
+				metaslab_sync = vdev_autotrim_wait_kick(vd,
+				    TXG_CONCURRENT_STATES + TXG_DEFER_SIZE);
+			}
+
+			metaslab_enable(msp, metaslab_sync, B_FALSE);
 			spa_config_enter(spa, SCL_CONFIG, FTAG, RW_READER);
 
 			for (uint64_t c = 0; c < children; c++) {
@@ -1392,12 +1423,7 @@ vdev_autotrim_thread(void *arg)
 
 		spa_config_exit(spa, SCL_CONFIG, FTAG);
 
-		mutex_enter(&vd->vdev_autotrim_lock);
-		if (!vd->vdev_autotrim_exit_wanted) {
-			cv_wait(&vd->vdev_autotrim_kick_cv,
-			    &vd->vdev_autotrim_lock);
-		}
-		mutex_exit(&vd->vdev_autotrim_lock);
+		vdev_autotrim_wait_kick(vd, 1);
 
 		shift++;
 		spa_config_enter(spa, SCL_CONFIG, FTAG, RW_READER);
