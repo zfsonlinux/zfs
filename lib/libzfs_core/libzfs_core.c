@@ -244,6 +244,20 @@ out:
 	return (error);
 }
 
+/*
+ * This is interface for scan/scrub to use new ioctl signature.
+ */
+int
+lzc_scrub(zfs_ioc_t ioc, const char *name,
+    nvlist_t *source, nvlist_t **resultp)
+{
+	int error;
+
+	error = lzc_ioctl(ioc, name, source, resultp);
+
+	return (error);
+}
+
 int
 lzc_create(const char *fsname, enum lzc_dataset_type type, nvlist_t *props,
     uint8_t *wkeydata, uint_t wkeylen)
