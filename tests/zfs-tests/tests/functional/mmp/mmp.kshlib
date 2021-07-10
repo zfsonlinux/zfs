@@ -221,14 +221,20 @@ check (${SECONDS}s gt $max_duration)"
 	return $rc
 }
 
-function import_activity_check # pool opts act_test_duration
+function import_activity_check # pool opts verbosity act_test_duration
 {
 	typeset pool=$1
 	typeset opts=$2
-	typeset min_duration=${3:-$MMP_TEST_DURATION_DEFAULT}
+	typeset verbose=$3
+	typeset min_duration=${4:-$MMP_TEST_DURATION_DEFAULT}
+	typeset tmpfile=$(mktemp)
+
+	if [[ $verbose = "verbose" ]]; then
+		opts="$opts -v"
+	fi
 
 	SECONDS=0
-	zpool import $opts $pool
+	zpool import $opts $pool | tee $tmpfile
 	typeset rc=$?
 
 	if [[ $SECONDS -le $min_duration ]]; then
@@ -236,6 +242,14 @@ function import_activity_check # pool opts act_test_duration
 (${SECONDS}s le min_duration $min_duration)"
 	fi
 
+	if [[ $verbose = "verbose" ]]; then
+		if ! grep "Multihost is checking" $tmpfile; then
+			log_fail "ERROR: import_activity_check expected \
+activity check completion time"
+		fi
+	fi
+
+	rm $tmpfile
 	return $rc
 }
 
