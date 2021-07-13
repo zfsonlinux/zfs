@@ -51,7 +51,7 @@ static sa_fstype_t *nfs_fstype;
 typedef int (*nfs_shareopt_callback_t)(const char *opt, const char *value,
     void *cookie);
 
-typedef int (*nfs_host_callback_t)(const char *sharepath, const char *filename,
+typedef int (*nfs_host_callback_t)(FILE *tmpfile, const char *sharepath,
     const char *host, const char *security, const char *access, void *cookie);
 
 /*
@@ -122,7 +122,7 @@ typedef struct nfs_host_cookie_s {
 	nfs_host_callback_t callback;
 	const char *sharepath;
 	void *cookie;
-	const char *filename;
+	FILE *tmpfile;
 	const char *security;
 } nfs_host_cookie_t;
 
@@ -166,7 +166,7 @@ foreach_nfs_host_cb(const char *opt, const char *value, void *pcookie)
 				next++;
 			}
 
-			error = udata->callback(udata->filename,
+			error = udata->callback(udata->tmpfile,
 			    udata->sharepath, host, udata->security,
 			    access, udata->cookie);
 
@@ -189,7 +189,7 @@ foreach_nfs_host_cb(const char *opt, const char *value, void *pcookie)
  * Invokes a callback function for all NFS hosts that are set for a share.
  */
 static int
-foreach_nfs_host(sa_share_impl_t impl_share, char *filename,
+foreach_nfs_host(sa_share_impl_t impl_share, FILE *tmpfile,
     nfs_host_callback_t callback, void *cookie)
 {
 	nfs_host_cookie_t udata;
@@ -198,7 +198,7 @@ foreach_nfs_host(sa_share_impl_t impl_share, char *filename,
 	udata.callback = callback;
 	udata.sharepath = impl_share->sa_mountpoint;
 	udata.cookie = cookie;
-	udata.filename = filename;
+	udata.tmpfile = tmpfile;
 	udata.security = "sys";
 
 	shareopts = FSINFO(impl_share, nfs_fstype)->shareopts;
@@ -210,8 +210,8 @@ foreach_nfs_host(sa_share_impl_t impl_share, char *filename,
 /*
  * Converts a Solaris NFS host specification to its Linux equivalent.
  */
-static int
-get_linux_hostspec(const char *solaris_hostspec, char **plinux_hostspec)
+static const char *
+get_linux_hostspec(const char *solaris_hostspec)
 {
 	/*
 	 * For now we just support CIDR masks (e.g. @192.168.0.0/16) and host
@@ -222,16 +222,10 @@ get_linux_hostspec(const char *solaris_hostspec, char **plinux_hostspec)
 		 * Solaris host specifier, e.g. @192.168.0.0/16; we just need
 		 * to skip the @ in this case
 		 */
-		*plinux_hostspec = strdup(solaris_hostspec + 1);
+		return (solaris_hostspec + 1);
 	} else {
-		*plinux_hostspec = strdup(solaris_hostspec);
+		return (solaris_hostspec);
 	}
-
-	if (*plinux_hostspec == NULL) {
-		return (SA_NO_MEMORY);
-	}
-
-	return (SA_OK);
 }
 
 /*
@@ -356,118 +350,30 @@ get_linux_shareopts(const char *shareopts, char **plinux_opts)
  * automatically exported upon boot or whenever the nfs server restarts.
  */
 static int
-nfs_add_entry(const char *filename, const char *sharepath,
+nfs_add_entry(FILE *tmpfile, const char *sharepath,
     const char *host, const char *security, const char *access_opts,
     void *pcookie)
 {
-	int error;
-	char *linuxhost;
 	const char *linux_opts = (const char *)pcookie;
-
-	error = get_linux_hostspec(host, &linuxhost);
-	if (error != SA_OK)
-		return (error);
 
 	if (linux_opts == NULL)
 		linux_opts = "";
 
-	FILE *fp = fopen(filename, "a+e");
-	if (fp == NULL) {
-		fprintf(stderr, "failed to open %s file: %s", filename,
-		    strerror(errno));
-		free(linuxhost);
+	if (fprintf(tmpfile, "%s %s(sec=%s,%s,%s)\n", sharepath,
+	    get_linux_hostspec(host), security, access_opts,
+	    linux_opts) < 0) {
+		fprintf(stderr, "failed to write to temporary file\n");
 		return (SA_SYSTEM_ERR);
 	}
 
-	if (fprintf(fp, "%s %s(sec=%s,%s,%s)\n", sharepath, linuxhost,
-	    security, access_opts, linux_opts) < 0) {
-		fprintf(stderr, "failed to write to %s\n", filename);
-		free(linuxhost);
-		fclose(fp);
-		return (SA_SYSTEM_ERR);
-	}
-
-	free(linuxhost);
-	if (fclose(fp) != 0) {
-		fprintf(stderr, "Unable to close file %s: %s\n",
-		    filename, strerror(errno));
-		return (SA_SYSTEM_ERR);
-	}
 	return (SA_OK);
-}
-
-/*
- * This function copies all entries from the exports file to "filename",
- * omitting any entries for the specified mountpoint.
- */
-int
-nfs_copy_entries(char *filename, const char *mountpoint)
-{
-	char *buf = NULL;
-	size_t buflen = 0;
-	int error = SA_OK;
-
-	FILE *oldfp = fopen(ZFS_EXPORTS_FILE, "re");
-	FILE *newfp = fopen(filename, "w+e");
-	if (newfp == NULL) {
-		fprintf(stderr, "failed to open %s file: %s", filename,
-		    strerror(errno));
-		fclose(oldfp);
-		return (SA_SYSTEM_ERR);
-	}
-	fputs(FILE_HEADER, newfp);
-
-	/*
-	 * The ZFS_EXPORTS_FILE may not exist yet. If that's the
-	 * case then just write out the new file.
-	 */
-	if (oldfp != NULL) {
-		while (getline(&buf, &buflen, oldfp) != -1) {
-			char *space = NULL;
-
-			if (buf[0] == '\n' || buf[0] == '#')
-				continue;
-
-			if ((space = strchr(buf, ' ')) != NULL) {
-				int mountpoint_len = strlen(mountpoint);
-
-				if (space - buf == mountpoint_len &&
-				    strncmp(mountpoint, buf,
-				    mountpoint_len) == 0) {
-					continue;
-				}
-			}
-			fputs(buf, newfp);
-		}
-
-		if (ferror(oldfp) != 0) {
-			error = ferror(oldfp);
-		}
-		if (fclose(oldfp) != 0) {
-			fprintf(stderr, "Unable to close file %s: %s\n",
-			    filename, strerror(errno));
-			error = error != 0 ? error : SA_SYSTEM_ERR;
-		}
-	}
-
-	if (error == 0 && ferror(newfp) != 0) {
-		error = ferror(newfp);
-	}
-
-	free(buf);
-	if (fclose(newfp) != 0) {
-		fprintf(stderr, "Unable to close file %s: %s\n",
-		    filename, strerror(errno));
-		error = error != 0 ? error : SA_SYSTEM_ERR;
-	}
-	return (error);
 }
 
 /*
  * Enables NFS sharing for the specified share.
  */
 static int
-nfs_enable_share_impl(sa_share_impl_t impl_share, char *filename)
+nfs_enable_share_impl(sa_share_impl_t impl_share, FILE *tmpfile)
 {
 	char *shareopts, *linux_opts;
 	int error;
@@ -477,7 +383,7 @@ nfs_enable_share_impl(sa_share_impl_t impl_share, char *filename)
 	if (error != SA_OK)
 		return (error);
 
-	error = foreach_nfs_host(impl_share, filename, nfs_add_entry,
+	error = foreach_nfs_host(impl_share, tmpfile, nfs_add_entry,
 	    linux_opts);
 	free(linux_opts);
 	return (error);
@@ -495,7 +401,7 @@ nfs_enable_share(sa_share_impl_t impl_share)
  * Disables NFS sharing for the specified share.
  */
 static int
-nfs_disable_share_impl(sa_share_impl_t impl_share, char *filename)
+nfs_disable_share_impl(sa_share_impl_t impl_share, FILE *tmpfile)
 {
 	return (SA_OK);
 }
@@ -511,31 +417,7 @@ nfs_disable_share(sa_share_impl_t impl_share)
 static boolean_t
 nfs_is_shared(sa_share_impl_t impl_share)
 {
-	size_t buflen = 0;
-	char *buf = NULL;
-
-	FILE *fp = fopen(ZFS_EXPORTS_FILE, "re");
-	if (fp == NULL) {
-		return (B_FALSE);
-	}
-	while ((getline(&buf, &buflen, fp)) != -1) {
-		char *space = NULL;
-
-		if ((space = strchr(buf, ' ')) != NULL) {
-			int mountpoint_len = strlen(impl_share->sa_mountpoint);
-
-			if (space - buf == mountpoint_len &&
-			    strncmp(impl_share->sa_mountpoint, buf,
-			    mountpoint_len) == 0) {
-				fclose(fp);
-				free(buf);
-				return (B_TRUE);
-			}
-		}
-	}
-	free(buf);
-	fclose(fp);
-	return (B_FALSE);
+	return (nfs_is_shared_impl(ZFS_EXPORTS_FILE, impl_share));
 }
 
 /*
