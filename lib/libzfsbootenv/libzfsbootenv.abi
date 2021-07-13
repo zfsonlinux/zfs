@@ -2,19 +2,22 @@
   <elf-needed>
     <dependency name='libzfs.so.4'/>
     <dependency name='libzfs_core.so.3'/>
-    <dependency name='libuuid.so.1'/>
-    <dependency name='libblkid.so.1'/>
-    <dependency name='libudev.so.1'/>
+    <dependency name='libudev.so.0'/>
     <dependency name='libuutil.so.3'/>
-    <dependency name='libm.so.6'/>
-    <dependency name='libcrypto.so.1.1'/>
-    <dependency name='libz.so.1'/>
+    <dependency name='libcrypto.so.111'/>
+    <dependency name='libz.so.6'/>
+    <dependency name='libdl.so.1'/>
+    <dependency name='libutil.so.9'/>
+    <dependency name='libgeom.so.5'/>
     <dependency name='libnvpair.so.3'/>
-    <dependency name='libtirpc.so.3'/>
-    <dependency name='libpthread.so.0'/>
-    <dependency name='libc.so.6'/>
+    <dependency name='libm.so.5'/>
+    <dependency name='libintl.so.8'/>
+    <dependency name='libthr.so.3'/>
+    <dependency name='libc.so.7'/>
   </elf-needed>
   <elf-function-symbols>
+    <elf-symbol name='_fini' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
+    <elf-symbol name='_init' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='lzbe_add_pair' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='lzbe_bootenv_print' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='lzbe_get_boot_device' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
@@ -24,189 +27,541 @@
     <elf-symbol name='lzbe_remove_pair' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='lzbe_set_boot_device' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
   </elf-function-symbols>
-  <abi-instr version='1.0' address-size='64' path='lzbe_device.c' comp-dir-path='/home/fedora/zfs/lib/libzfsbootenv' language='LANG_C99'>
+  <abi-instr version='1.0' address-size='64' path='lzbe_device.c' comp-dir-path='/media/svn/openzfs/forced_export/lib/libzfsbootenv' language='LANG_C99'>
     <type-decl name='char' size-in-bits='8' id='type-id-1'/>
-    <type-decl name='int' size-in-bits='32' id='type-id-2'/>
-    <type-decl name='unnamed-enum-underlying-type' is-anonymous='yes' size-in-bits='32' alignment-in-bits='32' id='type-id-3'/>
-    <typedef-decl name='lzbe_flags_t' type-id='type-id-4' filepath='../../include/libzfsbootenv.h' line='26' column='1' id='type-id-5'/>
-    <enum-decl name='lzbe_flags' filepath='../../include/libzfsbootenv.h' line='23' column='1' id='type-id-4'>
-      <underlying-type type-id='type-id-3'/>
+    <class-decl name='libzfs_handle' is-struct='yes' visibility='default' is-declaration-only='yes' id='type-id-2'/>
+    <class-decl name='zpool_handle' is-struct='yes' visibility='default' is-declaration-only='yes' id='type-id-3'/>
+    <type-decl name='int' size-in-bits='32' id='type-id-4'/>
+    <type-decl name='unnamed-enum-underlying-type-32' is-anonymous='yes' size-in-bits='32' alignment-in-bits='32' id='type-id-5'/>
+    <type-decl name='unsigned int' size-in-bits='32' id='type-id-6'/>
+    <type-decl name='unsigned long int' size-in-bits='64' id='type-id-7'/>
+    <type-decl name='variadic parameter type' id='type-id-8'/>
+    <type-decl name='void' id='type-id-9'/>
+    <typedef-decl name='lzbe_flags_t' type-id='type-id-10' id='type-id-11'/>
+    <enum-decl name='lzbe_flags' id='type-id-10'>
+      <underlying-type type-id='type-id-5'/>
       <enumerator name='lzbe_add' value='0'/>
       <enumerator name='lzbe_replace' value='1'/>
     </enum-decl>
-    <pointer-type-def type-id='type-id-1' size-in-bits='64' id='type-id-6'/>
-    <pointer-type-def type-id='type-id-6' size-in-bits='64' id='type-id-7'/>
-    <qualified-type-def type-id='type-id-1' const='yes' id='type-id-8'/>
-    <pointer-type-def type-id='type-id-8' size-in-bits='64' id='type-id-9'/>
-    <function-decl name='lzbe_get_boot_device' mangled-name='lzbe_get_boot_device' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_device.c' line='114' column='1' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='lzbe_get_boot_device'>
-      <parameter type-id='type-id-9' name='pool' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_device.c' line='114' column='1'/>
-      <parameter type-id='type-id-7' name='device' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_device.c' line='114' column='1'/>
-      <return type-id='type-id-2'/>
-    </function-decl>
-    <function-decl name='lzbe_set_boot_device' mangled-name='lzbe_set_boot_device' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_device.c' line='28' column='1' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='lzbe_set_boot_device'>
-      <parameter type-id='type-id-9' name='pool' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_device.c' line='28' column='1'/>
-      <parameter type-id='type-id-5' name='flag' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_device.c' line='28' column='1'/>
-      <parameter type-id='type-id-9' name='device' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_device.c' line='28' column='1'/>
-      <return type-id='type-id-2'/>
-    </function-decl>
-  </abi-instr>
-  <abi-instr version='1.0' address-size='64' path='lzbe_pair.c' comp-dir-path='/home/fedora/zfs/lib/libzfsbootenv' language='LANG_C99'>
-    <type-decl name='unsigned long int' size-in-bits='64' id='type-id-10'/>
-    <type-decl name='void' id='type-id-11'/>
-    <typedef-decl name='size_t' type-id='type-id-10' filepath='/usr/lib/gcc/x86_64-redhat-linux/10/include/stddef.h' line='209' column='1' id='type-id-12'/>
-    <pointer-type-def type-id='type-id-11' size-in-bits='64' id='type-id-13'/>
-    <pointer-type-def type-id='type-id-13' size-in-bits='64' id='type-id-14'/>
-    <function-decl name='lzbe_remove_pair' mangled-name='lzbe_remove_pair' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='343' column='1' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='lzbe_remove_pair'>
-      <parameter type-id='type-id-13' name='ptr' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='343' column='1'/>
-      <parameter type-id='type-id-9' name='key' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='343' column='1'/>
-      <return type-id='type-id-2'/>
-    </function-decl>
-    <function-decl name='lzbe_add_pair' mangled-name='lzbe_add_pair' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='182' column='1' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='lzbe_add_pair'>
-      <parameter type-id='type-id-13' name='ptr' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='182' column='1'/>
-      <parameter type-id='type-id-9' name='key' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='182' column='1'/>
-      <parameter type-id='type-id-9' name='type' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='182' column='1'/>
-      <parameter type-id='type-id-13' name='value' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='182' column='1'/>
-      <parameter type-id='type-id-12' name='size' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='183' column='1'/>
-      <return type-id='type-id-2'/>
-    </function-decl>
-    <function-decl name='lzbe_nvlist_free' mangled-name='lzbe_nvlist_free' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='131' column='1' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='lzbe_nvlist_free'>
-      <parameter type-id='type-id-13' name='ptr' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='131' column='1'/>
-      <return type-id='type-id-11'/>
-    </function-decl>
-    <function-decl name='lzbe_nvlist_set' mangled-name='lzbe_nvlist_set' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='74' column='1' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='lzbe_nvlist_set'>
-      <parameter type-id='type-id-9' name='pool' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='74' column='1'/>
-      <parameter type-id='type-id-9' name='key' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='74' column='1'/>
-      <parameter type-id='type-id-13' name='ptr' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='74' column='1'/>
-      <return type-id='type-id-2'/>
-    </function-decl>
-    <function-decl name='lzbe_nvlist_get' mangled-name='lzbe_nvlist_get' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='27' column='1' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='lzbe_nvlist_get'>
-      <parameter type-id='type-id-9' name='pool' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='27' column='1'/>
-      <parameter type-id='type-id-9' name='key' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='27' column='1'/>
-      <parameter type-id='type-id-14' name='ptr' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_pair.c' line='27' column='1'/>
-      <return type-id='type-id-2'/>
-    </function-decl>
-  </abi-instr>
-  <abi-instr version='1.0' address-size='64' path='lzbe_util.c' comp-dir-path='/home/fedora/zfs/lib/libzfsbootenv' language='LANG_C99'>
-
-
-    <array-type-def dimensions='1' type-id='type-id-1' size-in-bits='8' id='type-id-15'>
-      <subrange length='1' type-id='type-id-10' id='type-id-16'/>
-
-    </array-type-def>
-    <array-type-def dimensions='1' type-id='type-id-1' size-in-bits='160' id='type-id-17'>
-      <subrange length='20' type-id='type-id-10' id='type-id-18'/>
-
-    </array-type-def>
-    <class-decl name='_IO_codecvt' is-struct='yes' visibility='default' is-declaration-only='yes' id='type-id-19'/>
-    <class-decl name='_IO_marker' is-struct='yes' visibility='default' is-declaration-only='yes' id='type-id-20'/>
-    <class-decl name='_IO_wide_data' is-struct='yes' visibility='default' is-declaration-only='yes' id='type-id-21'/>
-    <type-decl name='long int' size-in-bits='64' id='type-id-22'/>
-    <type-decl name='signed char' size-in-bits='8' id='type-id-23'/>
-    <type-decl name='unsigned short int' size-in-bits='16' id='type-id-24'/>
-    <typedef-decl name='FILE' type-id='type-id-25' filepath='/usr/include/bits/types/FILE.h' line='7' column='1' id='type-id-26'/>
-    <class-decl name='_IO_FILE' size-in-bits='1728' is-struct='yes' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='49' column='1' id='type-id-25'>
+    <class-decl name='nvlist' size-in-bits='192' is-struct='yes' visibility='default' id='type-id-12'>
       <data-member access='public' layout-offset-in-bits='0'>
-        <var-decl name='_flags' type-id='type-id-2' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='51' column='1'/>
+        <var-decl name='nvl_version' type-id='type-id-13' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='32'>
+        <var-decl name='nvl_nvflag' type-id='type-id-14' visibility='default'/>
       </data-member>
       <data-member access='public' layout-offset-in-bits='64'>
-        <var-decl name='_IO_read_ptr' type-id='type-id-6' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='54' column='1'/>
+        <var-decl name='nvl_priv' type-id='type-id-15' visibility='default'/>
       </data-member>
       <data-member access='public' layout-offset-in-bits='128'>
-        <var-decl name='_IO_read_end' type-id='type-id-6' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='55' column='1'/>
+        <var-decl name='nvl_flag' type-id='type-id-14' visibility='default'/>
       </data-member>
-      <data-member access='public' layout-offset-in-bits='192'>
-        <var-decl name='_IO_read_base' type-id='type-id-6' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='56' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='256'>
-        <var-decl name='_IO_write_base' type-id='type-id-6' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='57' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='320'>
-        <var-decl name='_IO_write_ptr' type-id='type-id-6' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='58' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='384'>
-        <var-decl name='_IO_write_end' type-id='type-id-6' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='59' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='448'>
-        <var-decl name='_IO_buf_base' type-id='type-id-6' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='60' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='512'>
-        <var-decl name='_IO_buf_end' type-id='type-id-6' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='61' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='576'>
-        <var-decl name='_IO_save_base' type-id='type-id-6' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='64' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='640'>
-        <var-decl name='_IO_backup_base' type-id='type-id-6' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='65' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='704'>
-        <var-decl name='_IO_save_end' type-id='type-id-6' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='66' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='768'>
-        <var-decl name='_markers' type-id='type-id-27' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='68' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='832'>
-        <var-decl name='_chain' type-id='type-id-28' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='70' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='896'>
-        <var-decl name='_fileno' type-id='type-id-2' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='72' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='928'>
-        <var-decl name='_flags2' type-id='type-id-2' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='73' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='960'>
-        <var-decl name='_old_offset' type-id='type-id-29' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='74' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='1024'>
-        <var-decl name='_cur_column' type-id='type-id-24' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='77' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='1040'>
-        <var-decl name='_vtable_offset' type-id='type-id-23' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='78' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='1048'>
-        <var-decl name='_shortbuf' type-id='type-id-15' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='79' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='1088'>
-        <var-decl name='_lock' type-id='type-id-30' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='81' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='1152'>
-        <var-decl name='_offset' type-id='type-id-31' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='89' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='1216'>
-        <var-decl name='_codecvt' type-id='type-id-32' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='91' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='1280'>
-        <var-decl name='_wide_data' type-id='type-id-33' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='92' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='1344'>
-        <var-decl name='_freeres_list' type-id='type-id-28' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='93' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='1408'>
-        <var-decl name='_freeres_buf' type-id='type-id-13' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='94' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='1472'>
-        <var-decl name='__pad5' type-id='type-id-12' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='95' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='1536'>
-        <var-decl name='_mode' type-id='type-id-2' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='96' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='1568'>
-        <var-decl name='_unused2' type-id='type-id-17' visibility='default' filepath='/usr/include/bits/types/struct_FILE.h' line='98' column='1'/>
+      <data-member access='public' layout-offset-in-bits='160'>
+        <var-decl name='nvl_pad' type-id='type-id-13' visibility='default'/>
       </data-member>
     </class-decl>
-    <typedef-decl name='__off_t' type-id='type-id-22' filepath='/usr/include/bits/types.h' line='152' column='1' id='type-id-29'/>
-    <typedef-decl name='_IO_lock_t' type-id='type-id-11' filepath='/usr/include/bits/types/struct_FILE.h' line='43' column='1' id='type-id-34'/>
-    <typedef-decl name='__off64_t' type-id='type-id-22' filepath='/usr/include/bits/types.h' line='153' column='1' id='type-id-31'/>
-    <pointer-type-def type-id='type-id-26' size-in-bits='64' id='type-id-35'/>
-    <pointer-type-def type-id='type-id-25' size-in-bits='64' id='type-id-28'/>
-    <pointer-type-def type-id='type-id-19' size-in-bits='64' id='type-id-32'/>
-    <pointer-type-def type-id='type-id-34' size-in-bits='64' id='type-id-30'/>
-    <pointer-type-def type-id='type-id-20' size-in-bits='64' id='type-id-27'/>
-    <pointer-type-def type-id='type-id-21' size-in-bits='64' id='type-id-33'/>
-    <function-decl name='lzbe_bootenv_print' mangled-name='lzbe_bootenv_print' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_util.c' line='24' column='1' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='lzbe_bootenv_print'>
-      <parameter type-id='type-id-9' name='pool' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_util.c' line='24' column='1'/>
-      <parameter type-id='type-id-9' name='nvlist' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_util.c' line='24' column='1'/>
-      <parameter type-id='type-id-35' name='of' filepath='/home/fedora/zfs/lib/libzfsbootenv/lzbe_util.c' line='24' column='1'/>
-      <return type-id='type-id-2'/>
+    <typedef-decl name='int32_t' type-id='type-id-16' id='type-id-13'/>
+    <typedef-decl name='__int32_t' type-id='type-id-4' id='type-id-16'/>
+    <typedef-decl name='uint32_t' type-id='type-id-17' id='type-id-14'/>
+    <typedef-decl name='__uint32_t' type-id='type-id-6' id='type-id-17'/>
+    <typedef-decl name='uint64_t' type-id='type-id-18' id='type-id-15'/>
+    <typedef-decl name='__uint64_t' type-id='type-id-7' id='type-id-18'/>
+    <enum-decl name='__anonymous_enum__' is-anonymous='yes' id='type-id-19'>
+      <underlying-type type-id='type-id-5'/>
+      <enumerator name='B_FALSE' value='0'/>
+      <enumerator name='B_TRUE' value='1'/>
+    </enum-decl>
+    <pointer-type-def type-id='type-id-1' size-in-bits='64' id='type-id-20'/>
+    <pointer-type-def type-id='type-id-20' size-in-bits='64' id='type-id-21'/>
+    <qualified-type-def type-id='type-id-1' const='yes' id='type-id-22'/>
+    <pointer-type-def type-id='type-id-22' size-in-bits='64' id='type-id-23'/>
+    <qualified-type-def type-id='type-id-12' const='yes' id='type-id-24'/>
+    <pointer-type-def type-id='type-id-24' size-in-bits='64' id='type-id-25'/>
+    <pointer-type-def type-id='type-id-2' size-in-bits='64' id='type-id-26'/>
+    <pointer-type-def type-id='type-id-12' size-in-bits='64' id='type-id-27'/>
+    <pointer-type-def type-id='type-id-27' size-in-bits='64' id='type-id-28'/>
+    <pointer-type-def type-id='type-id-7' size-in-bits='64' id='type-id-29'/>
+    <pointer-type-def type-id='type-id-9' size-in-bits='64' id='type-id-30'/>
+    <pointer-type-def type-id='type-id-3' size-in-bits='64' id='type-id-31'/>
+    <function-decl name='lzbe_set_boot_device' mangled-name='lzbe_set_boot_device' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='lzbe_set_boot_device'>
+      <parameter type-id='type-id-23' name='pool'/>
+      <parameter type-id='type-id-11' name='flag'/>
+      <parameter type-id='type-id-23' name='device'/>
+      <return type-id='type-id-4'/>
     </function-decl>
+    <function-decl name='libzfs_init' visibility='default' binding='global' size-in-bits='64'>
+      <return type-id='type-id-26'/>
+    </function-decl>
+    <function-decl name='zpool_open' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-26'/>
+      <parameter type-id='type-id-23'/>
+      <return type-id='type-id-31'/>
+    </function-decl>
+    <function-decl name='zpool_get_bootenv' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-31'/>
+      <parameter type-id='type-id-28'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_lookup_uint64' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-29'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='fnvlist_free' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <return type-id='type-id-9'/>
+    </function-decl>
+    <function-decl name='fnvlist_alloc' visibility='default' binding='global' size-in-bits='64'>
+      <return type-id='type-id-27'/>
+    </function-decl>
+    <function-decl name='fnvlist_add_uint64' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-7'/>
+      <return type-id='type-id-9'/>
+    </function-decl>
+    <function-decl name='asprintf' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-21'/>
+      <parameter type-id='type-id-23'/>
+      <parameter is-variadic='yes'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='fnvlist_add_string' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-23'/>
+      <return type-id='type-id-9'/>
+    </function-decl>
+    <function-decl name='free' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-30'/>
+      <return type-id='type-id-9'/>
+    </function-decl>
+    <function-decl name='nvlist_exists' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <return type-id='type-id-19'/>
+    </function-decl>
+    <function-decl name='fnvlist_remove' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <return type-id='type-id-9'/>
+    </function-decl>
+    <function-decl name='zpool_set_bootenv' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-31'/>
+      <parameter type-id='type-id-25'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='libzfs_error_description' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-26'/>
+      <return type-id='type-id-23'/>
+    </function-decl>
+    <function-decl name='zpool_close' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-31'/>
+      <return type-id='type-id-9'/>
+    </function-decl>
+    <function-decl name='libzfs_fini' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-26'/>
+      <return type-id='type-id-9'/>
+    </function-decl>
+    <function-decl name='lzbe_get_boot_device' mangled-name='lzbe_get_boot_device' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='lzbe_get_boot_device'>
+      <parameter type-id='type-id-23' name='pool'/>
+      <parameter type-id='type-id-21' name='device'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_lookup_string' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-21'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_free' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <return type-id='type-id-9'/>
+    </function-decl>
+  </abi-instr>
+  <abi-instr version='1.0' address-size='64' path='lzbe_pair.c' comp-dir-path='/media/svn/openzfs/forced_export/lib/libzfsbootenv' language='LANG_C99'>
+    <type-decl name='long int' size-in-bits='64' id='type-id-32'/>
+    <type-decl name='short int' size-in-bits='16' id='type-id-33'/>
+    <type-decl name='signed char' size-in-bits='8' id='type-id-34'/>
+    <type-decl name='unsigned char' size-in-bits='8' id='type-id-35'/>
+    <type-decl name='unsigned short int' size-in-bits='16' id='type-id-36'/>
+    <typedef-decl name='size_t' type-id='type-id-37' id='type-id-38'/>
+    <typedef-decl name='__size_t' type-id='type-id-18' id='type-id-37'/>
+    <pointer-type-def type-id='type-id-19' size-in-bits='64' id='type-id-39'/>
+    <qualified-type-def type-id='type-id-20' const='yes' id='type-id-40'/>
+    <pointer-type-def type-id='type-id-40' size-in-bits='64' id='type-id-41'/>
+    <pointer-type-def type-id='type-id-4' size-in-bits='64' id='type-id-42'/>
+    <pointer-type-def type-id='type-id-32' size-in-bits='64' id='type-id-43'/>
+    <pointer-type-def type-id='type-id-33' size-in-bits='64' id='type-id-44'/>
+    <pointer-type-def type-id='type-id-34' size-in-bits='64' id='type-id-45'/>
+    <pointer-type-def type-id='type-id-35' size-in-bits='64' id='type-id-46'/>
+    <pointer-type-def type-id='type-id-6' size-in-bits='64' id='type-id-47'/>
+    <pointer-type-def type-id='type-id-36' size-in-bits='64' id='type-id-48'/>
+    <pointer-type-def type-id='type-id-30' size-in-bits='64' id='type-id-49'/>
+    <function-decl name='lzbe_nvlist_get' mangled-name='lzbe_nvlist_get' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='lzbe_nvlist_get'>
+      <parameter type-id='type-id-23' name='pool'/>
+      <parameter type-id='type-id-23' name='key'/>
+      <parameter type-id='type-id-49' name='ptr'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_lookup_nvlist' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-28'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_alloc' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-28'/>
+      <parameter type-id='type-id-6'/>
+      <parameter type-id='type-id-4'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_dup' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-28'/>
+      <parameter type-id='type-id-4'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='lzbe_nvlist_set' mangled-name='lzbe_nvlist_set' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='lzbe_nvlist_set'>
+      <parameter type-id='type-id-23' name='pool'/>
+      <parameter type-id='type-id-23' name='key'/>
+      <parameter type-id='type-id-30' name='ptr'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_nvlist' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-27'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='lzbe_nvlist_free' mangled-name='lzbe_nvlist_free' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='lzbe_nvlist_free'>
+      <parameter type-id='type-id-30' name='ptr'/>
+      <return type-id='type-id-9'/>
+    </function-decl>
+    <function-decl name='lzbe_add_pair' mangled-name='lzbe_add_pair' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='lzbe_add_pair'>
+      <parameter type-id='type-id-30' name='ptr'/>
+      <parameter type-id='type-id-23' name='key'/>
+      <parameter type-id='type-id-23' name='type'/>
+      <parameter type-id='type-id-30' name='value'/>
+      <parameter type-id='type-id-38' name='size'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_byte' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-35'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_int16' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-33'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_uint16' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-36'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_int32' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-4'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_uint32' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-6'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_int64' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-32'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_uint64' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-7'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_string' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-23'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_byte_array' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-46'/>
+      <parameter type-id='type-id-6'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_int16_array' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-44'/>
+      <parameter type-id='type-id-6'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_uint16_array' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-48'/>
+      <parameter type-id='type-id-6'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_int32_array' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-42'/>
+      <parameter type-id='type-id-6'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_uint32_array' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-47'/>
+      <parameter type-id='type-id-6'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_int64_array' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-43'/>
+      <parameter type-id='type-id-6'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_uint64_array' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-29'/>
+      <parameter type-id='type-id-6'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_string_array' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-41'/>
+      <parameter type-id='type-id-6'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_nvlist_array' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-28'/>
+      <parameter type-id='type-id-6'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_boolean_value' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-19'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_uint8' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-35'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_boolean_array' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-39'/>
+      <parameter type-id='type-id-6'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_int8_array' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-45'/>
+      <parameter type-id='type-id-6'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_uint8_array' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-46'/>
+      <parameter type-id='type-id-6'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_add_int8' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-34'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='lzbe_remove_pair' mangled-name='lzbe_remove_pair' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='lzbe_remove_pair'>
+      <parameter type-id='type-id-30' name='ptr'/>
+      <parameter type-id='type-id-23' name='key'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_remove_all' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-27'/>
+      <parameter type-id='type-id-23'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+  </abi-instr>
+  <abi-instr version='1.0' address-size='64' path='lzbe_util.c' comp-dir-path='/media/svn/openzfs/forced_export/lib/libzfsbootenv' language='LANG_C99'>
+    <type-decl name='__ARRAY_SIZE_TYPE__' size-in-bits='64' id='type-id-50'/>
+    <array-type-def dimensions='1' type-id='type-id-1' size-in-bits='1024' id='type-id-51'>
+      <subrange length='128' type-id='type-id-50' id='type-id-52'/>
+    </array-type-def>
+    <class-decl name='pthread' is-struct='yes' visibility='default' is-declaration-only='yes' id='type-id-53'/>
+    <class-decl name='pthread_mutex' is-struct='yes' visibility='default' is-declaration-only='yes' id='type-id-54'/>
+    <array-type-def dimensions='1' type-id='type-id-35' size-in-bits='8' id='type-id-55'>
+      <subrange length='1' type-id='type-id-50' id='type-id-56'/>
+    </array-type-def>
+    <array-type-def dimensions='1' type-id='type-id-35' size-in-bits='24' id='type-id-57'>
+      <subrange length='3' type-id='type-id-50' id='type-id-58'/>
+    </array-type-def>
+    <typedef-decl name='FILE' type-id='type-id-59' id='type-id-60'/>
+    <class-decl name='__sFILE' size-in-bits='2496' is-struct='yes' visibility='default' id='type-id-59'>
+      <data-member access='public' layout-offset-in-bits='0'>
+        <var-decl name='_p' type-id='type-id-46' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='64'>
+        <var-decl name='_r' type-id='type-id-4' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='96'>
+        <var-decl name='_w' type-id='type-id-4' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='128'>
+        <var-decl name='_flags' type-id='type-id-33' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='144'>
+        <var-decl name='_file' type-id='type-id-33' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='192'>
+        <var-decl name='_bf' type-id='type-id-61' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='320'>
+        <var-decl name='_lbfsize' type-id='type-id-4' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='384'>
+        <var-decl name='_cookie' type-id='type-id-30' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='448'>
+        <var-decl name='_close' type-id='type-id-62' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='512'>
+        <var-decl name='_read' type-id='type-id-63' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='576'>
+        <var-decl name='_seek' type-id='type-id-64' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='640'>
+        <var-decl name='_write' type-id='type-id-65' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='704'>
+        <var-decl name='_ub' type-id='type-id-61' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='832'>
+        <var-decl name='_up' type-id='type-id-46' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='896'>
+        <var-decl name='_ur' type-id='type-id-4' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='928'>
+        <var-decl name='_ubuf' type-id='type-id-57' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='952'>
+        <var-decl name='_nbuf' type-id='type-id-55' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='960'>
+        <var-decl name='_lb' type-id='type-id-61' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='1088'>
+        <var-decl name='_blksize' type-id='type-id-4' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='1152'>
+        <var-decl name='_offset' type-id='type-id-66' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='1216'>
+        <var-decl name='_fl_mutex' type-id='type-id-67' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='1280'>
+        <var-decl name='_fl_owner' type-id='type-id-68' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='1344'>
+        <var-decl name='_fl_count' type-id='type-id-4' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='1376'>
+        <var-decl name='_orientation' type-id='type-id-4' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='1408'>
+        <var-decl name='_mbstate' type-id='type-id-69' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='2432'>
+        <var-decl name='_flags2' type-id='type-id-4' visibility='default'/>
+      </data-member>
+    </class-decl>
+    <class-decl name='__sbuf' size-in-bits='128' is-struct='yes' visibility='default' id='type-id-61'>
+      <data-member access='public' layout-offset-in-bits='0'>
+        <var-decl name='_base' type-id='type-id-46' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='64'>
+        <var-decl name='_size' type-id='type-id-4' visibility='default'/>
+      </data-member>
+    </class-decl>
+    <typedef-decl name='fpos_t' type-id='type-id-70' id='type-id-66'/>
+    <typedef-decl name='__off_t' type-id='type-id-71' id='type-id-70'/>
+    <typedef-decl name='__int64_t' type-id='type-id-32' id='type-id-71'/>
+    <typedef-decl name='__mbstate_t' type-id='type-id-72' id='type-id-69'/>
+    <union-decl name='__anonymous_union__' size-in-bits='1024' is-anonymous='yes' visibility='default' id='type-id-72'>
+      <data-member access='private'>
+        <var-decl name='__mbstate8' type-id='type-id-51' visibility='default'/>
+      </data-member>
+      <data-member access='private'>
+        <var-decl name='_mbstateL' type-id='type-id-71' visibility='default'/>
+      </data-member>
+    </union-decl>
+    <pointer-type-def type-id='type-id-60' size-in-bits='64' id='type-id-73'/>
+    <pointer-type-def type-id='type-id-59' size-in-bits='64' id='type-id-74'/>
+    <pointer-type-def type-id='type-id-75' size-in-bits='64' id='type-id-62'/>
+    <pointer-type-def type-id='type-id-76' size-in-bits='64' id='type-id-63'/>
+    <pointer-type-def type-id='type-id-77' size-in-bits='64' id='type-id-65'/>
+    <pointer-type-def type-id='type-id-53' size-in-bits='64' id='type-id-68'/>
+    <pointer-type-def type-id='type-id-54' size-in-bits='64' id='type-id-67'/>
+    <pointer-type-def type-id='type-id-78' size-in-bits='64' id='type-id-64'/>
+    <function-decl name='lzbe_bootenv_print' mangled-name='lzbe_bootenv_print' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='lzbe_bootenv_print'>
+      <parameter type-id='type-id-23' name='pool'/>
+      <parameter type-id='type-id-23' name='nvlist'/>
+      <parameter type-id='type-id-73' name='of'/>
+      <return type-id='type-id-4'/>
+    </function-decl>
+    <function-decl name='nvlist_print' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='type-id-74'/>
+      <parameter type-id='type-id-27'/>
+      <return type-id='type-id-9'/>
+    </function-decl>
+    <function-type size-in-bits='64' id='type-id-75'>
+      <parameter type-id='type-id-30'/>
+      <return type-id='type-id-4'/>
+    </function-type>
+    <function-type size-in-bits='64' id='type-id-76'>
+      <parameter type-id='type-id-30'/>
+      <parameter type-id='type-id-20'/>
+      <parameter type-id='type-id-4'/>
+      <return type-id='type-id-4'/>
+    </function-type>
+    <function-type size-in-bits='64' id='type-id-77'>
+      <parameter type-id='type-id-30'/>
+      <parameter type-id='type-id-23'/>
+      <parameter type-id='type-id-4'/>
+      <return type-id='type-id-4'/>
+    </function-type>
+    <function-type size-in-bits='64' id='type-id-78'>
+      <parameter type-id='type-id-30'/>
+      <parameter type-id='type-id-66'/>
+      <parameter type-id='type-id-4'/>
+      <return type-id='type-id-66'/>
+    </function-type>
   </abi-instr>
 </abi-corpus>
