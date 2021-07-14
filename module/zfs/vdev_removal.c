@@ -168,6 +168,27 @@ spa_nvlist_lookup_by_guid(nvlist_t **nvpp, int count, uint64_t target_guid)
 }
 
 static void
+vdev_activate(vdev_t *vd)
+{
+	metaslab_group_t *mg = vd->vdev_mg;
+	spa_t *spa = vd->vdev_spa;
+
+	ASSERT(!vd->vdev_islog);
+	ASSERT(vd->vdev_noalloc);
+
+	metaslab_group_activate(mg);
+	metaslab_group_activate(vd->vdev_log_mg);
+
+	ASSERT3U(spa->spa_nonallocating_dspace, >=, spa_deflate(spa) ?
+	    vd->vdev_stat.vs_dspace : vd->vdev_stat.vs_space);
+
+	spa->spa_nonallocating_dspace -= spa_deflate(spa) ?
+	    vd->vdev_stat.vs_dspace : vd->vdev_stat.vs_space;
+
+	vd->vdev_noalloc = B_FALSE;
+}
+
+static void
 spa_vdev_remove_aux(nvlist_t *config, char *name, nvlist_t **dev, int count,
     nvlist_t *dev_to_remove)
 {
@@ -1200,6 +1221,15 @@ vdev_remove_complete(spa_t *spa)
 	zfs_dbgmsg("finishing device removal for vdev %llu in txg %llu",
 	    (u_longlong_t)vd->vdev_id, (u_longlong_t)txg);
 
+	ASSERT3U(0, <, spa_deflate(spa) ?
+	    vd->vdev_stat.vs_dspace : vd->vdev_stat.vs_space);
+	ASSERT3U(spa->spa_nonallocating_dspace, >=, spa_deflate(spa) ?
+	    vd->vdev_stat.vs_dspace : vd->vdev_stat.vs_space);
+
+	/* the vdev is no longer part of the dspace */
+	spa->spa_nonallocating_dspace -= spa_deflate(spa) ?
+	    vd->vdev_stat.vs_dspace : vd->vdev_stat.vs_space;
+
 	/*
 	 * Discard allocation state.
 	 */
@@ -1619,6 +1649,44 @@ spa_vdev_remove_suspend(spa_t *spa)
 	mutex_exit(&svr->svr_lock);
 }
 
+static boolean_t
+vdev_prop_noalloc(vdev_t *vd)
+{
+	spa_t *spa = vd->vdev_spa;
+	objset_t *mos = spa->spa_meta_objset;
+	uint64_t objid;
+	uint64_t allocating = 1;
+	int err = 0;
+
+	ASSERT(vd != NULL);
+
+	if (vd->vdev_top_zap != 0) {
+		objid = vd->vdev_top_zap;
+	} else if (vd->vdev_leaf_zap != 0) {
+		objid = vd->vdev_leaf_zap;
+	} else {
+		objid = 0;
+	}
+
+	/* no vdev property object => no props */
+	if (mos == NULL || objid == 0) {
+		return (B_FALSE);
+	}
+
+	mutex_enter(&spa->spa_props_lock);
+
+	err = zap_lookup(mos, objid, vdev_prop_to_name(VDEV_PROP_ALLOCATING),
+	    sizeof (uint64_t), 1, &allocating);
+
+	mutex_exit(&spa->spa_props_lock);
+
+	if (err && err == ENOENT) {
+		return (B_FALSE);
+	}
+
+	return (allocating == 0);
+}
+
 /* ARGSUSED */
 static int
 spa_vdev_remove_cancel_check(void *arg, dmu_tx_t *tx)
@@ -1761,6 +1829,14 @@ spa_vdev_remove_cancel_sync(void *arg, dmu_tx_t *tx)
 	spa_finish_removal(spa, DSS_CANCELED, tx);
 
 	vd->vdev_removing = B_FALSE;
+
+	if (!vdev_prop_noalloc(vd)) {
+		/* XXX - not sure locking is correct/necessary... */
+		spa_config_enter(spa, SCL_ALLOC | SCL_VDEV, FTAG, RW_WRITER);
+		vdev_activate(vd);
+		spa_config_exit(spa, SCL_ALLOC | SCL_VDEV, FTAG);
+	}
+
 	vdev_config_dirty(vd);
 
 	zfs_dbgmsg("canceled device removal for vdev %llu in %llu",
@@ -1774,21 +1850,9 @@ spa_vdev_remove_cancel_sync(void *arg, dmu_tx_t *tx)
 static int
 spa_vdev_remove_cancel_impl(spa_t *spa)
 {
-	uint64_t vdid = spa->spa_vdev_removal->svr_vdev_id;
-
 	int error = dsl_sync_task(spa->spa_name, spa_vdev_remove_cancel_check,
 	    spa_vdev_remove_cancel_sync, NULL, 0,
 	    ZFS_SPACE_CHECK_EXTRA_RESERVED);
-
-	if (error == 0) {
-		spa_config_enter(spa, SCL_ALLOC | SCL_VDEV, FTAG, RW_WRITER);
-		vdev_t *vd = vdev_lookup_top(spa, vdid);
-		metaslab_group_activate(vd->vdev_mg);
-		ASSERT(!vd->vdev_islog);
-		metaslab_group_activate(vd->vdev_log_mg);
-		spa_config_exit(spa, SCL_ALLOC | SCL_VDEV, FTAG);
-	}
-
 	return (error);
 }
 
@@ -1984,6 +2048,11 @@ spa_vdev_remove_top_check(vdev_t *vd)
 	if (!spa_feature_is_enabled(spa, SPA_FEATURE_DEVICE_REMOVAL))
 		return (SET_ERROR(ENOTSUP));
 
+	/*
+	 * This device is already being removed
+	 */
+	if (vd->vdev_removing)
+		return (SET_ERROR(EALREADY));
 
 	metaslab_class_t *mc = vd->vdev_mg->mg_class;
 	metaslab_class_t *normal = spa_normal_class(spa);
@@ -2006,13 +2075,15 @@ spa_vdev_remove_top_check(vdev_t *vd)
 		/* available space in the pool's normal class */
 		uint64_t available = dsl_dir_space_available(
 		    spa->spa_dsl_pool->dp_root_dir, NULL, 0, B_TRUE);
-		if (available <
-		    vd->vdev_stat.vs_dspace + spa_get_slop_space(spa)) {
+		/* non-allocating vdevs have already been taken out of space */
+		if (!vd->vdev_noalloc)
+			available -= vd->vdev_stat.vs_dspace;
+		if (available < spa_get_slop_space(spa)) {
 			/*
-			 * This is a normal device. There has to be enough free
-			 * space to remove the device and leave double the
-			 * "slop" space (i.e. we must leave at least 3% of the
-			 * pool free, in addition to the normal slop space).
+			 * There has to be enough free space to remove the
+			 * device and leave double the "slop" space (i.e.
+			 * we must leave at least 3% of the pool free, in
+			 * addition to the normal slop space).
 			 */
 			return (SET_ERROR(ENOSPC));
 		}
@@ -2096,38 +2167,78 @@ spa_vdev_remove_top_check(vdev_t *vd)
 	return (0);
 }
 
-/*
- * Initiate removal of a top-level vdev, reducing the total space in the pool.
- * The config lock is held for the specified TXG.  Once initiated,
- * evacuation of all allocated space (copying it to other vdevs) happens
- * in the background (see spa_vdev_remove_thread()), and can be canceled
- * (see spa_vdev_remove_cancel()).  If successful, the vdev will
- * be transformed to an indirect vdev (see spa_vdev_remove_complete()).
- */
+int
+spa_vdev_alloc(spa_t *spa, uint64_t guid)
+{
+	vdev_t *vd;
+	uint64_t txg;
+	int error = 0;
+
+	ASSERT(!MUTEX_HELD(&spa_namespace_lock));
+	ASSERT(spa_writeable(spa));
+
+	/* XXX - is this necessary for activate? */
+	txg = spa_vdev_enter(spa);
+
+	ASSERT(MUTEX_HELD(&spa_namespace_lock));
+
+	vd = spa_lookup_by_guid(spa, guid, B_FALSE);
+
+	if (vd == NULL)
+		error = SET_ERROR(ENOENT);
+	else if (vd->vdev_mg == NULL)
+		error = SET_ERROR(ENOTSUP);
+	else if (!vd->vdev_removing)
+		vdev_activate(vd);
+
+	if (error == 0) {
+		vdev_dirty_leaves(vd, VDD_DTL, txg);
+		vdev_config_dirty(vd);
+	}
+
+	(void) spa_vdev_exit(spa, NULL, txg, error);
+
+	return (error);
+}
+
 static int
-spa_vdev_remove_top(vdev_t *vd, uint64_t *txg)
+vdev_passivate(vdev_t *vd, uint64_t *txg)
 {
 	spa_t *spa = vd->vdev_spa;
 	int error;
 
-	/*
-	 * Check for errors up-front, so that we don't waste time
-	 * passivating the metaslab group and clearing the ZIL if there
-	 * are errors.
-	 */
-	error = spa_vdev_remove_top_check(vd);
-	if (error != 0)
-		return (error);
+	ASSERT(!vd->vdev_noalloc);
 
-	/*
-	 * Stop allocating from this vdev.  Note that we must check
-	 * that this is not the only device in the pool before
-	 * passivating, otherwise we will not be able to make
-	 * progress because we can't allocate from any vdevs.
-	 * The above check for sufficient free space serves this
-	 * purpose.
-	 */
+	vdev_t *rvd = spa->spa_root_vdev;
 	metaslab_group_t *mg = vd->vdev_mg;
+	metaslab_class_t *normal = spa_normal_class(spa);
+	if (mg->mg_class == normal) {
+		/*
+		 * We must check that this is not the only allocating device in
+		 * the pool before passivating, otherwise we will not be able
+		 * to make progress because we can't allocate from any vdevs.
+		 */
+		boolean_t last = B_TRUE;
+		for (uint64_t id = 0; id < rvd->vdev_children; id++) {
+			vdev_t *cvd = rvd->vdev_child[id];
+
+			if (cvd == vd ||
+			    cvd->vdev_ops == &vdev_indirect_ops)
+				continue;
+
+			metaslab_class_t *mc = vd->vdev_mg->mg_class;
+			if (mc != normal)
+				continue;
+
+			if (!cvd->vdev_noalloc) {
+				last = B_FALSE;
+				break;
+			}
+		}
+		if (last)
+			return (SET_ERROR(EINVAL));
+	}
+
 	metaslab_group_passivate(mg);
 	ASSERT(!vd->vdev_islog);
 	metaslab_group_passivate(vd->vdev_log_mg);
@@ -2147,11 +2258,69 @@ spa_vdev_remove_top(vdev_t *vd, uint64_t *txg)
 	 */
 	error = spa_reset_logs(spa);
 
+	*txg = spa_vdev_config_enter(spa);
+
+	if (error != 0) {
+		metaslab_group_activate(mg);
+		ASSERT(!vd->vdev_islog);
+		if (vd->vdev_log_mg != NULL)
+			metaslab_group_activate(vd->vdev_log_mg);
+		return (error);
+	}
+
+	spa->spa_nonallocating_dspace += spa_deflate(spa) ?
+	    vd->vdev_stat.vs_dspace : vd->vdev_stat.vs_space;
+	vd->vdev_noalloc = B_TRUE;
+
+	return (0);
+}
+
+/*
+ * Initiate removal of a top-level vdev, reducing the total space in the pool.
+ * The config lock is held for the specified TXG.  Once initiated,
+ * evacuation of all allocated space (copying it to other vdevs) happens
+ * in the background (see spa_vdev_remove_thread()), and can be canceled
+ * (see spa_vdev_remove_cancel()).  If successful, the vdev will
+ * be transformed to an indirect vdev (see spa_vdev_remove_complete()).
+ */
+static int
+spa_vdev_remove_top(vdev_t *vd, uint64_t *txg)
+{
+	spa_t *spa = vd->vdev_spa;
+	boolean_t set_noalloc = B_FALSE;
+	int error;
+
+	/*
+	 * Check for errors up-front, so that we don't waste time
+	 * passivating the metaslab group and clearing the ZIL if there
+	 * are errors.
+	 */
+	error = spa_vdev_remove_top_check(vd);
+
+	/*
+	 * Stop allocating from this vdev.  Note that we must check
+	 * that this is not the only device in the pool before
+	 * passivating, otherwise we will not be able to make
+	 * progress because we can't allocate from any vdevs.
+	 * The above check for sufficient free space serves this
+	 * purpose.
+	 */
+	if (error == 0 && !vd->vdev_noalloc) {
+		set_noalloc = B_TRUE;
+		error = vdev_passivate(vd, txg);
+	}
+
+	if (error != 0)
+		return (error);
+
 	/*
 	 * We stop any initializing and TRIM that is currently in progress
 	 * but leave the state as "active". This will allow the process to
 	 * resume if the removal is canceled sometime later.
 	 */
+
+	spa_vdev_config_exit(spa, NULL, *txg, 0, FTAG);
+
 	vdev_initialize_stop_all(vd, VDEV_INITIALIZE_ACTIVE);
 	vdev_trim_stop_all(vd, VDEV_TRIM_ACTIVE);
 	vdev_autotrim_stop_wait(vd);
@@ -2162,13 +2331,11 @@ spa_vdev_remove_top(vdev_t *vd, uint64_t *txg)
 	 * Things might have changed while the config lock was dropped
 	 * (e.g. space usage).  Check for errors again.
 	 */
-	if (error == 0)
-		error = spa_vdev_remove_top_check(vd);
+	error = spa_vdev_remove_top_check(vd);
 
 	if (error != 0) {
-		metaslab_group_activate(mg);
-		ASSERT(!vd->vdev_islog);
-		metaslab_group_activate(vd->vdev_log_mg);
+		if (set_noalloc)
+			vdev_activate(vd);
 		spa_async_request(spa, SPA_ASYNC_INITIALIZE_RESTART);
 		spa_async_request(spa, SPA_ASYNC_TRIM_RESTART);
 		spa_async_request(spa, SPA_ASYNC_AUTOTRIM_RESTART);
@@ -2185,6 +2352,48 @@ spa_vdev_remove_top(vdev_t *vd, uint64_t *txg)
 	dmu_tx_commit(tx);
 
 	return (0);
+}
+
+/*
+ * Turn off allocations for a top-level device from the pool.
+ *
+ * Turning off allocations for a top-level device can take a significant
+ * amount of time. As a result we use the spa_vdev_config_[enter/exit]
+ * functions which allow us to grab and release the spa_config_lock while
+ * still holding the namespace lock. During each step the configuration
+ * is synced out.
+ */
+int
+spa_vdev_noalloc(spa_t *spa, uint64_t guid)
+{
+	vdev_t *vd;
+	uint64_t txg;
+	int error = 0;
+
+	ASSERT(!MUTEX_HELD(&spa_namespace_lock));
+	ASSERT(spa_writeable(spa));
+
+	txg = spa_vdev_enter(spa);
+
+	ASSERT(MUTEX_HELD(&spa_namespace_lock));
+
+	vd = spa_lookup_by_guid(spa, guid, B_FALSE);
+
+	if (vd == NULL)
+		error = SET_ERROR(ENOENT);
+	else if (vd->vdev_mg == NULL)
+		error = SET_ERROR(ENOTSUP);
+	else if (!vd->vdev_noalloc)
+		error = vdev_passivate(vd, &txg);
+
+	if (error == 0) {
+		vdev_dirty_leaves(vd, VDD_DTL, txg);
+		vdev_config_dirty(vd);
+	}
+
+	error = spa_vdev_exit(spa, NULL, txg, error);
+
+	return (error);
 }
 
 /*

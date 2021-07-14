@@ -470,6 +470,36 @@ zhack_do_feature(int argc, char **argv)
 	return (0);
 }
 
+static int
+zhack_do_zap(int argc, char **argv)
+{
+	spa_t *spa;
+	uint64_t obj;
+	char *target;
+
+	argc--;
+	argv++;
+
+	if (argc < 1) {
+		(void) fprintf(stderr, "error: missing pool name\n");
+		usage();
+	}
+	if (argc < 2) {
+		(void) fprintf(stderr, "error: missing object id\n");
+		usage();
+	}
+	target = argv[0];
+	obj = strtoull(argv[1], NULL, 0);
+
+	zhack_spa_open(target, B_TRUE, FTAG, &spa);
+
+	dump_obj(spa->spa_meta_objset, obj, argv[1]);
+
+	spa_close(spa, FTAG);
+
+	return (0);
+}
+
 #define	MAX_NUM_PATHS 1024
 
 int
@@ -515,6 +545,8 @@ main(int argc, char **argv)
 
 	if (strcmp(subcommand, "feature") == 0) {
 		rv = zhack_do_feature(argc, argv);
+	} else if (strcmp(subcommand, "zap") == 0) {
+		rv = zhack_do_zap(argc, argv);
 	} else {
 		(void) fprintf(stderr, "error: unknown subcommand: %s\n",
 		    subcommand);

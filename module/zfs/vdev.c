@@ -28,6 +28,7 @@
  * Copyright 2017 Joyent, Inc.
  * Copyright (c) 2017, Intel Corporation.
  * Copyright (c) 2019, Datto Inc. All rights reserved.
+ * Copyright (c) 2021, Klara Inc.
  * Copyright [2021] Hewlett Packard Enterprise Development LP
  */
 
@@ -59,6 +60,7 @@
 #include <sys/vdev_trim.h>
 #include <sys/zvol.h>
 #include <sys/zfs_ratelimit.h>
+#include "zfs_prop.h"
 
 /*
  * One metaslab from each (normal-class) vdev is used by the ZIL.  These are
@@ -866,6 +868,8 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 		    &vd->vdev_ms_shift);
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_ASIZE,
 		    &vd->vdev_asize);
+		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NONALLOCATING,
+		    &vd->vdev_noalloc);
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_REMOVING,
 		    &vd->vdev_removing);
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_VDEV_TOP_ZAP,
@@ -1184,8 +1188,10 @@ vdev_top_transfer(vdev_t *svd, vdev_t *tvd)
 	ASSERT3P(tvd->vdev_indirect_mapping, ==, NULL);
 	ASSERT3P(tvd->vdev_indirect_births, ==, NULL);
 	ASSERT3P(tvd->vdev_obsolete_sm, ==, NULL);
+	ASSERT0(tvd->vdev_noalloc);
 	ASSERT0(tvd->vdev_removing);
 	ASSERT0(tvd->vdev_rebuilding);
+	tvd->vdev_noalloc = svd->vdev_noalloc;
 	tvd->vdev_removing = svd->vdev_removing;
 	tvd->vdev_rebuilding = svd->vdev_rebuilding;
 	tvd->vdev_rebuild_config = svd->vdev_rebuild_config;
@@ -1201,6 +1207,7 @@ vdev_top_transfer(vdev_t *svd, vdev_t *tvd)
 	svd->vdev_indirect_mapping = NULL;
 	svd->vdev_indirect_births = NULL;
 	svd->vdev_obsolete_sm = NULL;
+	svd->vdev_noalloc = 0;
 	svd->vdev_removing = 0;
 	svd->vdev_rebuilding = 0;
 
@@ -1499,14 +1506,18 @@ vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 		spa_config_enter(spa, SCL_ALLOC, FTAG, RW_WRITER);
 
 	/*
-	 * If the vdev is being removed we don't activate
-	 * the metaslabs since we want to ensure that no new
-	 * allocations are performed on this device.
+	 * If the vdev is marked as non-allocating then don't
+	 * activate the metaslabs since we want to ensure that
+	 * no allocations are performed on this device.
 	 */
-	if (!expanding && !vd->vdev_removing) {
+	if (!expanding && !vd->vdev_noalloc) {
 		metaslab_group_activate(vd->vdev_mg);
 		if (vd->vdev_log_mg != NULL)
 			metaslab_group_activate(vd->vdev_log_mg);
+	} else if (vd->vdev_noalloc) {
+		/* track non-allocating vdev space */
+		spa->spa_nonallocating_dspace += spa_deflate(spa) ?
+		    vd->vdev_stat.vs_dspace : vd->vdev_stat.vs_space;
 	}
 
 	if (txg == 0)
@@ -4439,6 +4450,7 @@ vdev_get_stats_ex(vdev_t *vd, vdev_stat_t *vs, vdev_stat_ex_t *vsx)
 			vs->vs_fragmentation = (vd->vdev_mg != NULL) ?
 			    vd->vdev_mg->mg_fragmentation : 0;
 		}
+		vs->vs_noalloc = vd->vdev_noalloc;
 	}
 
 	vdev_get_stats_ex_impl(vd, vs, vsx);
@@ -5348,6 +5360,22 @@ vdev_xlate_walk(vdev_t *vd, const range_seg64_t *logical_rs,
 	}
 }
 
+static char *
+vdev_name(vdev_t *vd, char *buf, int buflen)
+{
+	if (vd->vdev_path == NULL) {
+		if (strcmp(vd->vdev_ops->vdev_op_type, "root") == 0) {
+			return (vd->vdev_spa->spa_name);
+		} else if (!vd->vdev_ops->vdev_op_leaf) {
+			snprintf(buf, buflen, "%s-%llu",
+			    vd->vdev_ops->vdev_op_type,
+			    (u_longlong_t)vd->vdev_id);
+			return (buf);
+		}
+	}
+	return (vd->vdev_path);
+}
+
 /*
  * Look at the vdev tree and determine whether any devices are currently being
  * replaced.
@@ -5375,6 +5403,610 @@ vdev_replace_in_progress(vdev_t *vdev)
 	}
 
 	return (B_FALSE);
+}
+
+/*
+ * Add a (source=src, propname=propval) list to an nvlist.
+ */
+static void
+vdev_prop_add_list(nvlist_t *nvl, const char *propname, char *strval,
+    uint64_t intval, zprop_source_t src)
+{
+	nvlist_t *propval;
+
+	if (nvl == NULL)
+		return;
+
+	VERIFY(nvlist_alloc(&propval, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+	VERIFY(nvlist_add_uint64(propval, ZPROP_SOURCE, src) == 0);
+
+	if (strval != NULL)
+		VERIFY(nvlist_add_string(propval, ZPROP_VALUE, strval) == 0);
+	else
+		VERIFY(nvlist_add_uint64(propval, ZPROP_VALUE, intval) == 0);
+
+	VERIFY(nvlist_add_nvlist(nvl, propname, propval) == 0);
+	nvlist_free(propval);
+}
+
+static void
+vdev_sync_props(void *arg, dmu_tx_t *tx)
+{
+	vdev_t *vd;
+	nvlist_t *nvp = arg;
+	spa_t *spa = dmu_tx_pool(tx)->dp_spa;
+	objset_t *mos = spa->spa_meta_objset;
+	nvpair_t *elem = NULL;
+	uint64_t vdev_guid;
+	nvlist_t *nvprops;
+
+	if (nvlist_lookup_uint64(nvp, ZPOOL_VDEV_PROPS_SET_VDEV,
+	    &vdev_guid) != 0)
+		return;
+
+	if ((vd = spa_lookup_by_guid(spa, vdev_guid, B_TRUE)) == NULL)
+		return;
+
+	(void) nvlist_lookup_nvlist(nvp, ZPOOL_VDEV_PROPS_SET_PROPS, &nvprops);
+
+	mutex_enter(&spa->spa_props_lock);
+
+	while ((elem = nvlist_next_nvpair(nvprops, elem)) != NULL) {
+		uint64_t intval, objid = 0;
+		char *strval;
+		vdev_prop_t prop;
+		const char *propname = nvpair_name(elem);
+		zprop_type_t proptype;
+
+		/*
+		 * Set vdev property values in the vdev props mos object.
+		 */
+		if (vd->vdev_top_zap != 0) {
+			objid = vd->vdev_top_zap;
+		} else if (vd->vdev_leaf_zap != 0) {
+			objid = vd->vdev_leaf_zap;
+		} else {
+			/* XXX: what do we do here? */
+			ASSERT(0);
+		}
+
+		switch (prop = vdev_name_to_prop(propname)) {
+		case VDEV_PROP_INVAL:
+			if (vdev_prop_user(propname)) {
+				strval = fnvpair_value_string(elem);
+				if (strlen(strval) == 0) {
+					/* remove the property if value == "" */
+					(void) zap_remove(mos, objid, propname,
+					    tx);
+				} else {
+					VERIFY0(zap_update(mos, objid, propname,
+					    1, strlen(strval) + 1, strval, tx));
+				}
+				spa_history_log_internal(spa, "vdev set", tx,
+				    "vdev_guid=%llu: %s=%s",
+				    (u_longlong_t)vdev_guid, nvpair_name(elem),
+				    strval);
+			}
+			break;
+		default:
+			/* normalize the property name */
+			propname = vdev_prop_to_name(prop);
+			proptype = vdev_prop_get_type(prop);
+
+			if (nvpair_type(elem) == DATA_TYPE_STRING) {
+				ASSERT(proptype == PROP_TYPE_STRING);
+				strval = fnvpair_value_string(elem);
+				VERIFY0(zap_update(mos, objid, propname,
+				    1, strlen(strval) + 1, strval, tx));
+				spa_history_log_internal(spa, "vdev set", tx,
+				    "vdev_guid=%llu: %s=%s",
+				    (u_longlong_t)vdev_guid, nvpair_name(elem),
+				    strval);
+			} else if (nvpair_type(elem) == DATA_TYPE_UINT64) {
+				intval = fnvpair_value_uint64(elem);
+
+				if (proptype == PROP_TYPE_INDEX) {
+					const char *unused;
+					VERIFY0(vdev_prop_index_to_string(
+					    prop, intval, &unused));
+				}
+				VERIFY0(zap_update(mos, objid, propname,
+				    sizeof (uint64_t), 1, &intval, tx));
+				spa_history_log_internal(spa, "vdev set", tx,
+				    "vdev_guid=%llu: %s=%lld",
+				    (u_longlong_t)vdev_guid,
+				    nvpair_name(elem), (longlong_t)intval);
+			} else {
+				ASSERT(0); /* not allowed */
+			}
+		}
+
+	}
+
+	mutex_exit(&spa->spa_props_lock);
+}
+
+int
+vdev_prop_set(vdev_t *vd, nvlist_t *innvl, nvlist_t *outnvl)
+{
+	spa_t *spa = vd->vdev_spa;
+	nvpair_t *elem = NULL;
+	uint64_t vdev_guid;
+	nvlist_t *nvprops;
+	int error;
+
+	ASSERT(vd != NULL);
+
+	if (nvlist_lookup_uint64(innvl, ZPOOL_VDEV_PROPS_SET_VDEV,
+	    &vdev_guid) != 0)
+		return (SET_ERROR(EINVAL));
+
+	(void) nvlist_lookup_nvlist(innvl, ZPOOL_VDEV_PROPS_SET_PROPS,
+	    &nvprops);
+
+#if 0
+	if ((error = vdev_prop_validate(spa, nvprops)) != 0)
+		return (error);
+#endif
+
+	while ((elem = nvlist_next_nvpair(nvprops, elem)) != NULL) {
+		char *propname = nvpair_name(elem);
+		vdev_prop_t prop = vdev_name_to_prop(propname);
+		uint64_t intval = 0;
+		char *strval = NULL;
+
+		if (prop == VDEV_PROP_INVAL && !vdev_prop_user(propname)) {
+			error = EINVAL;
+			goto end;
+		}
+
+		if (vdev_prop_readonly(prop)) {
+			error = EROFS;
+			goto end;
+		}
+
+		/* Special Processing */
+		switch (prop) {
+		case VDEV_PROP_PATH:
+			strval = vd->vdev_path;
+			if (strval == NULL)
+				error = EROFS;
+			else if (nvpair_type(elem) != DATA_TYPE_STRING)
+				error = EINVAL;
+			if (error != 0)
+				break;
+			strval = fnvpair_value_string(elem);
+			if (strval == NULL)
+				error = EINVAL;
+			if (error != 0)
+				break;
+			spa_strfree(vd->vdev_path);
+			vd->vdev_path = spa_strdup(strval);
+			spa_config_enter(spa, SCL_CONFIG, FTAG, RW_WRITER);
+			vdev_config_dirty(vd->vdev_top);
+			spa_config_exit(spa, SCL_CONFIG, FTAG);
+			break;
+		case VDEV_PROP_ALLOCATING:
+			intval = fnvpair_value_uint64(elem);
+			if (intval != vd->vdev_noalloc)
+				break;
+			if (intval == 1)
+				error = spa_vdev_alloc(spa, vdev_guid);
+			else
+				error = spa_vdev_noalloc(spa, vdev_guid);
+			break;
+		default:
+			/* Most processing is done in vdev_sync_props */
+			break;
+		}
+end:
+		if (error != 0) {
+			intval = error;
+			vdev_prop_add_list(outnvl, propname, strval, intval, 0);
+			return (error);
+		}
+	}
+
+	return (dsl_sync_task(spa->spa_name, NULL, vdev_sync_props,
+	    innvl, 6, ZFS_SPACE_CHECK_RESERVED));
+}
+
+int
+vdev_prop_get(vdev_t *vd, nvlist_t *innvl, nvlist_t *outnvl)
+{
+	spa_t *spa = vd->vdev_spa;
+	objset_t *mos = spa->spa_meta_objset;
+	zap_cursor_t zc;
+	zap_attribute_t za;
+	int err = 0;
+	uint64_t objid;
+	uint64_t vdev_guid;
+	nvpair_t *elem = NULL;
+	nvlist_t *nvprops = NULL;
+	uint64_t intval = 0;
+	char *strval = NULL;
+	const char *propname = NULL;
+	vdev_prop_t prop;
+
+	ASSERT(vd != NULL);
+
+	if (nvlist_lookup_uint64(innvl, ZPOOL_VDEV_PROPS_GET_VDEV,
+	    &vdev_guid) != 0)
+		return (SET_ERROR(EINVAL));
+
+	(void) nvlist_lookup_nvlist(innvl, ZPOOL_VDEV_PROPS_GET_PROPS,
+	    &nvprops);
+
+	/*
+	 * XXX todo: check:
+	 * zap_lookup(mos, DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_VDEV_ZAP_MAP);
+	 */
+
+	if (vd->vdev_top_zap != 0) {
+		objid = vd->vdev_top_zap;
+	} else if (vd->vdev_leaf_zap != 0) {
+		objid = vd->vdev_leaf_zap;
+	} else {
+		/* XXX: what do we do here? */
+		return (SET_ERROR(EINVAL));
+	}
+
+	/* If no vdev property object, no more prop to get. */
+	if (mos == NULL || objid == 0) {
+		return (SET_ERROR(EINVAL));
+	}
+
+	mutex_enter(&spa->spa_props_lock);
+
+	if (nvprops != NULL) {
+		char namebuf[64] = { 0 };
+
+		while ((elem = nvlist_next_nvpair(nvprops, elem)) != NULL) {
+			intval = 0;
+			strval = NULL;
+			propname = nvpair_name(elem);
+			prop = vdev_name_to_prop(propname);
+			zprop_source_t src = ZPROP_SRC_DEFAULT;
+
+			switch (prop) {
+			/* Special Read-only Properties */
+			case VDEV_PROP_NAME:
+				strval = vdev_name(vd, namebuf, 64);
+				if (strval == NULL)
+					continue;
+				vdev_prop_add_list(outnvl, propname, strval, 0,
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_CAPACITY:
+				/* percent used */
+				intval = (vd->vdev_stat.vs_dspace == 0) ? 0 :
+				    (vd->vdev_stat.vs_alloc * 100 /
+				    vd->vdev_stat.vs_dspace);
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    intval, ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_STATE:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_state, ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_GUID:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_guid, ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_ASIZE:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_asize, ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_PSIZE:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_psize, ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_ASHIFT:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_ashift, ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_SIZE:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_dspace, ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_FREE:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_dspace -
+				    vd->vdev_stat.vs_alloc, ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_ALLOCATED:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_alloc, ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_EXPANDSZ:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_esize, ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_FRAGMENTATION:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_fragmentation,
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_PARITY:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vdev_get_nparity(vd), ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_PATH:
+				if (vd->vdev_path == NULL)
+					continue;
+				vdev_prop_add_list(outnvl, propname,
+				    vd->vdev_path, 0, ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_DEVID:
+				if (vd->vdev_devid == NULL)
+					continue;
+				vdev_prop_add_list(outnvl, propname,
+				    vd->vdev_devid, 0, ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_PHYS_PATH:
+				if (vd->vdev_physpath == NULL)
+					continue;
+				vdev_prop_add_list(outnvl, propname,
+				    vd->vdev_physpath, 0, ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_ENC_PATH:
+				if (vd->vdev_enc_sysfs_path == NULL)
+					continue;
+				vdev_prop_add_list(outnvl, propname,
+				    vd->vdev_enc_sysfs_path, 0, ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_FRU:
+				if (vd->vdev_fru == NULL)
+					continue;
+				vdev_prop_add_list(outnvl, propname,
+				    vd->vdev_fru, 0, ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_PARENT:
+				if (vd->vdev_parent != NULL) {
+					strval = vdev_name(vd->vdev_parent,
+					    namebuf, 64);
+					vdev_prop_add_list(outnvl, propname,
+					    strval, 0, ZPROP_SRC_NONE);
+				}
+				continue;
+			case VDEV_PROP_CHILDREN:
+				if (vd->vdev_children > 0)
+					strval = kmem_zalloc(ZAP_MAXVALUELEN,
+					    KM_SLEEP);
+				for (uint64_t i = 0; i < vd->vdev_children;
+				    i++) {
+					char *vname;
+
+					vname = vdev_name(vd->vdev_child[i],
+					    namebuf, 64);
+					if (vname == NULL)
+						vname = "(unknown)";
+					if (strlen(strval) > 0)
+						strlcat(strval, " ",
+						    ZAP_MAXVALUELEN);
+					strlcat(strval, vname, ZAP_MAXVALUELEN);
+				}
+				if (strval != NULL) {
+					vdev_prop_add_list(outnvl, propname,
+					    strval, 0, ZPROP_SRC_NONE);
+					kmem_free(strval, ZAP_MAXVALUELEN);
+				}
+				continue;
+			case VDEV_PROP_NUMCHILDREN:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_children, ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_READ_ERRORS:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_read_errors,
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_WRITE_ERRORS:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_write_errors,
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_CHECKSUM_ERRORS:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_checksum_errors,
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_INITIALIZE_ERRORS:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_initialize_errors,
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_OPS_NULL:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_ops[ZIO_TYPE_NULL],
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_OPS_READ:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_ops[ZIO_TYPE_READ],
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_OPS_WRITE:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_ops[ZIO_TYPE_WRITE],
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_OPS_FREE:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_ops[ZIO_TYPE_FREE],
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_OPS_CLAIM:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_ops[ZIO_TYPE_CLAIM],
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_OPS_TRIM:
+				/*
+				 * TRIM ops and bytes are reported to user
+				 * space as ZIO_TYPE_IOCTL.  This is done to
+				 * preserve the vdev_stat_t structure layout
+				 * for user space.
+				 */
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_ops[ZIO_TYPE_IOCTL],
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_BYTES_NULL:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_bytes[ZIO_TYPE_NULL],
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_BYTES_READ:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_bytes[ZIO_TYPE_READ],
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_BYTES_WRITE:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_bytes[ZIO_TYPE_WRITE],
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_BYTES_FREE:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_bytes[ZIO_TYPE_FREE],
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_BYTES_CLAIM:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_bytes[ZIO_TYPE_CLAIM],
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_BYTES_TRIM:
+				/*
+				 * TRIM ops and bytes are reported to user
+				 * space as ZIO_TYPE_IOCTL.  This is done to
+				 * preserve the vdev_stat_t structure layout
+				 * for user space.
+				 */
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_stat.vs_bytes[ZIO_TYPE_IOCTL],
+				    ZPROP_SRC_NONE);
+				continue;
+			case VDEV_PROP_REMOVING:
+				vdev_prop_add_list(outnvl, propname, NULL,
+				    vd->vdev_removing, ZPROP_SRC_NONE);
+				continue;
+			/* Numeric Properites */
+			case VDEV_PROP_ALLOCATING:
+				src = ZPROP_SRC_LOCAL;
+				strval = NULL;
+
+				err = zap_lookup(mos, objid, nvpair_name(elem),
+				    sizeof (uint64_t), 1, &intval);
+				if (err == ENOENT)
+					intval =
+					    vdev_prop_default_numeric(prop);
+				else if (err)
+					break;
+				if (intval == vdev_prop_default_numeric(prop))
+					src = ZPROP_SRC_DEFAULT;
+				vdev_prop_add_list(outnvl, propname, strval,
+				    intval, src);
+				break;
+			/* Text Properties */
+			case VDEV_PROP_COMMENT:
+				/* Exists in the ZAP below */
+				/* FALLTHRU */
+			case VDEV_PROP_INVAL:
+				/* User Properites */
+				src = ZPROP_SRC_LOCAL;
+
+				/*
+				 * za.za_integer_length is an int, but
+				 * zap_length() expects a uint64_t.
+				 * Use za_first_integer instead.
+				 */
+				err = zap_length(mos, objid, nvpair_name(elem),
+				    &za.za_first_integer, &za.za_num_integers);
+				if (err)
+					break;
+
+				za.za_integer_length = za.za_first_integer;
+				za.za_first_integer = 0;
+
+				switch (za.za_integer_length) {
+				case 8:
+					/* User properties cannot be integers */
+					err = EINVAL;
+					break;
+				case 1:
+					/* string property */
+					strval = kmem_alloc(za.za_num_integers,
+					    KM_SLEEP);
+					err = zap_lookup(mos, objid,
+					    nvpair_name(elem), 1,
+					    za.za_num_integers, strval);
+					if (err) {
+						kmem_free(strval,
+						    za.za_num_integers);
+						break;
+					}
+					vdev_prop_add_list(outnvl, propname,
+					    strval, 0, src);
+					kmem_free(strval, za.za_num_integers);
+					break;
+				}
+				break;
+			default:
+				err = ENOENT;
+				break;
+			}
+			if (err)
+				break;
+		}
+	} else {
+		/*
+		 * Get all properties from the MOS vdev property object.
+		 */
+		for (zap_cursor_init(&zc, mos, objid);
+		    (err = zap_cursor_retrieve(&zc, &za)) == 0;
+		    zap_cursor_advance(&zc)) {
+			intval = 0;
+			strval = NULL;
+			zprop_source_t src = ZPROP_SRC_DEFAULT;
+			propname = za.za_name;
+			prop = vdev_name_to_prop(propname);
+
+			switch (za.za_integer_length) {
+			case 8:
+				/* We do not allow integer user properties */
+				/* This is likely an internal value */
+				continue;
+				break;
+			case 1:
+				/* string property */
+				strval = kmem_alloc(za.za_num_integers,
+				    KM_SLEEP);
+				err = zap_lookup(mos, objid, za.za_name, 1,
+				    za.za_num_integers, strval);
+				if (err) {
+					kmem_free(strval, za.za_num_integers);
+					break;
+				}
+				vdev_prop_add_list(outnvl, propname, strval, 0,
+				    src);
+				kmem_free(strval, za.za_num_integers);
+				break;
+
+			default:
+				break;
+			}
+		}
+		zap_cursor_fini(&zc);
+	}
+
+	mutex_exit(&spa->spa_props_lock);
+	if (err && err != ENOENT) {
+		return (err);
+	}
+
+	return (0);
 }
 
 EXPORT_SYMBOL(vdev_fault);
