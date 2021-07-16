@@ -1798,6 +1798,16 @@ vdev_draid_io_verify(vdev_t *vd, raidz_row_t *rr, int col)
 #endif
 }
 
+static void
+vdev_draid_child_done(zio_t *zio)
+{
+	raidz_col_t *rc = zio->io_private;
+
+	rc->rc_error = zio->io_error;
+	rc->rc_tried = 1;
+	rc->rc_skipped = 0;
+}
+
 /*
  * For write operations:
  * 1. Generate the parity data
@@ -1828,7 +1838,7 @@ vdev_draid_io_start_write(zio_t *zio, raidz_row_t *rr)
 		zio_nowait(zio_vdev_child_io(zio, NULL,
 		    vd->vdev_child[rc->rc_devidx], rc->rc_offset,
 		    rc->rc_abd, rc->rc_size, zio->io_type, zio->io_priority,
-		    0, vdev_raidz_child_done, rc));
+		    0, vdev_draid_child_done, rc));
 	}
 }
 
@@ -1978,7 +1988,7 @@ vdev_draid_io_start_read(zio_t *zio, raidz_row_t *rr)
 			zio_nowait(zio_vdev_child_io(zio, NULL, cvd,
 			    rc->rc_offset, rc->rc_abd, rc->rc_size,
 			    zio->io_type, zio->io_priority, 0,
-			    vdev_raidz_child_done, rc));
+			    vdev_draid_child_done, rc));
 		}
 	}
 }
