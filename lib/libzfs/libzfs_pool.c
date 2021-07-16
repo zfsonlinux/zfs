@@ -2807,6 +2807,7 @@ nvlist_t *
 zpool_find_vdev(zpool_handle_t *zhp, const char *path, boolean_t *avail_spare,
     boolean_t *l2cache, boolean_t *log)
 {
+	char buf[MAXPATHLEN];
 	char *end;
 	nvlist_t *nvroot, *search, *ret;
 	uint64_t guid;
@@ -2818,6 +2819,9 @@ zpool_find_vdev(zpool_handle_t *zhp, const char *path, boolean_t *avail_spare,
 		verify(nvlist_add_uint64(search, ZPOOL_CONFIG_GUID, guid) == 0);
 	} else if (zpool_vdev_is_interior(path)) {
 		verify(nvlist_add_string(search, ZPOOL_CONFIG_TYPE, path) == 0);
+	} else if (path[0] != '/') {
+		(void) snprintf(buf, sizeof (buf), "/dev/%s", path);
+		verify(nvlist_add_string(search, ZPOOL_CONFIG_PATH, buf) == 0);
 	} else {
 		verify(nvlist_add_string(search, ZPOOL_CONFIG_PATH, path) == 0);
 	}
@@ -3072,11 +3076,11 @@ zpool_vdev_online(zpool_handle_t *zhp, const char *path, int flags,
 		}
 
 		if (wholedisk) {
-			const char *fullpath = path;
+			const char *fullpath = pathname;
 			char buf[MAXPATHLEN];
 
-			if (path[0] != '/') {
-				error = zfs_resolve_shortname(path, buf,
+			if (pathname[0] != '/') {
+				error = zfs_resolve_shortname(pathname, buf,
 				    sizeof (buf));
 				if (error != 0)
 					return (zfs_error(hdl, EZFS_NODEVICE,
