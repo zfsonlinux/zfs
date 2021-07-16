@@ -750,7 +750,7 @@ vdev_rebuild_thread(void *arg)
 	 */
 	dsl_pool_t *dsl = spa_get_dsl(spa);
 	if (dsl_scan_scrubbing(dsl))
-		dsl_scan_cancel(dsl);
+		dsl_scan_cancel(dsl, POOL_SCAN_SCRUB);
 
 	spa_config_enter(spa, SCL_CONFIG, FTAG, RW_READER);
 	mutex_enter(&vd->vdev_rebuild_lock);

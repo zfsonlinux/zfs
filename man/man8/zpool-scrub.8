@@ -38,6 +38,7 @@
 .Cm scrub
 .Op Fl s Ns | Ns Fl p
 .Op Fl w
+.Op Fl e
 .Ar pool Ns …
 .
 .Sh DESCRIPTION
@@ -78,8 +79,14 @@ During this period, no completion time estimate will be provided.
 .Bl -tag -width "-s"
 .It Fl s
 Stop scrubbing.
+Along with
+.Fl e
+stops any error scrub.
 .It Fl p
 Pause scrubbing.
+Along with
+.Fl e
+pauses any error scrub.
 Scrub pause state and progress are periodically synced to disk.
 If the system is restarted or pool is exported during a paused scrub,
 even after import, scrub will remain paused until it is resumed.
@@ -87,9 +94,22 @@ Once resumed the scrub will pick up from the place where it was last
 checkpointed to disk.
 To resume a paused scrub issue
 .Nm zpool Cm scrub
+or
+.Nm zpool Cm scrub
+.Fl e
 again.
 .It Fl w
 Wait until scrub has completed before returning.
+.It Fl e
+Only scrub blocks in the error log.
+Error scrubs can also be paused and cancelled with
+.Fl p
+and
+.Fl s
+respectively.
+Error scrubbing is I/O-intensive and cannot run simultaneously with regular
+scrubbing or resilvering.
+It also cannot run if a regular scrub is in the paused state.
 .El
 .
 .Sh SEE ALSO
