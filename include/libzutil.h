@@ -84,6 +84,7 @@ struct udev_device;
 _LIBZUTIL_H int zfs_device_get_devid(struct udev_device *, char *, size_t);
 _LIBZUTIL_H int zfs_device_get_physical(struct udev_device *, char *, size_t);
 
+_LIBZUTIL_H void update_vdevs_config_dev_sysfs_path(nvlist_t *config);
 _LIBZUTIL_H void update_vdev_config_dev_strs(nvlist_t *);
 
 /*

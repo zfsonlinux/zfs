@@ -213,18 +213,6 @@ namespace_reload(libzfs_handle_t *hdl)
 }
 
 /*
- * Retrieve the configuration for the given pool. The configuration is an nvlist
- * describing the vdevs, as well as the statistics associated with each one.
- */
-nvlist_t *
-zpool_get_config(zpool_handle_t *zhp, nvlist_t **oldconfig)
-{
-	if (oldconfig)
-		*oldconfig = zhp->zpool_old_config;
-	return (zhp->zpool_config);
-}
-
-/*
  * Retrieves a list of enabled features and their refcounts and caches it in
  * the pool handle.
  */

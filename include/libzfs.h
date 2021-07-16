@@ -828,6 +828,13 @@ _LIBZFS_H boolean_t zfs_dataset_exists(libzfs_handle_t *, const char *,
 _LIBZFS_H int zfs_spa_version(zfs_handle_t *, int *);
 _LIBZFS_H boolean_t zfs_bookmark_exists(const char *path);
 
+/* Vdev list functions */
+typedef int (*pool_vdev_iter_f)(zpool_handle_t *, nvlist_t *, void *);
+extern int for_each_vdev(zpool_handle_t *zhp, pool_vdev_iter_f func,
+    void *data);
+extern int for_each_vdev_in_nvlist(nvlist_t *nvroot, pool_vdev_iter_f func,
+    void *data);
+
 /*
  * Mount support functions.
  */

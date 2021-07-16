@@ -5,7 +5,7 @@ AM_CFLAGS += $(NO_UNUSED_BUT_SET_VARIABLE)
 AM_CFLAGS += $(LIBBLKID_CFLAGS) $(LIBUDEV_CFLAGS)
 AM_CFLAGS += -fvisibility=hidden
 
-DEFAULT_INCLUDES += -I$(srcdir)
+DEFAULT_INCLUDES += -I$(srcdir) -I$(top_srcdir)/lib/libzfs
 
 noinst_LTLIBRARIES = libzutil.la
 

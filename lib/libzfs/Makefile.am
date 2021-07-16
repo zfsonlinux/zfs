@@ -75,7 +75,8 @@ libzfs_la_LIBADD = \
 	$(abs_top_builddir)/lib/libshare/libshare.la \
 	$(abs_top_builddir)/lib/libzfs_core/libzfs_core.la \
 	$(abs_top_builddir)/lib/libnvpair/libnvpair.la \
-	$(abs_top_builddir)/lib/libuutil/libuutil.la
+	$(abs_top_builddir)/lib/libuutil/libuutil.la \
+	$(abs_top_builddir)/lib/libzutil/libzutil.la
 
 libzfs_la_LIBADD += -lm $(LIBCRYPTO_LIBS) $(ZLIB_LIBS) $(LIBFETCH_LIBS) $(LTLIBINTL)
 
