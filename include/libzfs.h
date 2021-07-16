@@ -960,6 +960,17 @@ _LIBZFS_H int zpool_nextboot(libzfs_handle_t *, uint64_t, uint64_t,
 
 #endif /* __FreeBSD__ */
 
+#ifdef __APPLE__
+
+/*
+ * Manual mounting of snapshots.
+ */
+_LIBZFS_H int zfs_snapshot_mount(zfs_handle_t *, const char *, int);
+_LIBZFS_H int zfs_snapshot_unmount(zfs_handle_t *, int);
+_LIBZFS_H void zfs_rollback_os(zfs_handle_t *);
+
+#endif /* __APPLE__ */
+
 #ifdef	__cplusplus
 }
 #endif
