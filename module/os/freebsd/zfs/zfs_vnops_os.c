@@ -5488,7 +5488,7 @@ zfs_deleteextattr_sa(struct vop_deleteextattr_args *ap, const char *attrname)
 	nvl = zp->z_xattr_cached;
 	error = nvlist_remove(nvl, attrname, DATA_TYPE_BYTE_ARRAY);
 	if (error == 0)
-		error = zfs_sa_set_xattr(zp);
+		error = zfs_sa_set_xattr(zp, attrname, NULL, 0);
 	if (error != 0) {
 		zp->z_xattr_cached = NULL;
 		nvlist_free(nvl);
@@ -5624,9 +5624,9 @@ zfs_setextattr_sa(struct vop_setextattr_args *ap, const char *attrname)
 	error = uiomove(buf, entry_size, ap->a_uio);
 	if (error == 0)
 		error = nvlist_add_byte_array(nvl, attrname, buf, entry_size);
-	kmem_free(buf, entry_size);
 	if (error == 0)
-		error = zfs_sa_set_xattr(zp);
+		error = zfs_sa_set_xattr(zp, attrname, buf, entry_size);
+	kmem_free(buf, entry_size);
 	if (error != 0) {
 		zp->z_xattr_cached = NULL;
 		nvlist_free(nvl);
