@@ -175,11 +175,34 @@ log_must ln /$TESTPOOL/$TESTFS/link_and_unlink \
    /$TESTPOOL/$TESTFS/link_and_unlink.link
 log_must rm /$TESTPOOL/$TESTFS/link_and_unlink.link
 
+# We can't test RENAME_* flags without renameat2(2) support.
+if ! is_linux ; then
+	log_note "renameat2 is linux-only"
+elif ! renameat2 -C ; then
+	log_note "renameat2 not supported on this (pre-3.15) linux kernel"
+else
+	# RENAME_EXCHANGE
+	log_must dd if=/dev/urandom of=/$TESTPOOL/$TESTFS/xchg-a bs=1k count=1
+	log_must dd if=/dev/urandom of=/$TESTPOOL/$TESTFS/xchg-b bs=1k count=1
+	log_must dd if=/dev/urandom of=/$TESTPOOL/$TESTFS/xchg-c bs=1k count=1
+	log_must dd if=/dev/urandom of=/$TESTPOOL/$TESTFS/xchg-d bs=1k count=1
+	# rotate the files around
+	log_must renameat2 -x /$TESTPOOL/$TESTFS/xchg-{a,b}
+	log_must renameat2 -x /$TESTPOOL/$TESTFS/xchg-{b,c}
+	log_must renameat2 -x /$TESTPOOL/$TESTFS/xchg-{c,a}
+	# exchange same path
+	log_must renameat2 -x /$TESTPOOL/$TESTFS/xchg-{d,d}
+
+	# RENAME_WHITEOUT
+	log_must mkfile 1k /$TESTPOOL/$TESTFS/whiteout
+	log_must renameat2 -w /$TESTPOOL/$TESTFS/whiteout{,-moved}
+fi
+
 #
 # 4. Copy TESTFS to temporary location (TESTDIR/copy)
 #
-log_must mkdir -p $TESTDIR/copy
-log_must cp -a /$TESTPOOL/$TESTFS/* $TESTDIR/copy/
+log_must mkdir -p $TESTDIR
+log_must rsync -aHAX /$TESTPOOL/$TESTFS/ $TESTDIR/copy
 
 #
 # 5. Unmount filesystem and export the pool
@@ -213,7 +236,7 @@ log_must ls_xattr /$TESTPOOL/$TESTFS/xattr.dir
 log_must ls_xattr /$TESTPOOL/$TESTFS/xattr.file
 
 log_note "Verify working set diff:"
-log_must diff -r /$TESTPOOL/$TESTFS $TESTDIR/copy
+log_must directory_diff $TESTDIR/copy /$TESTPOOL/$TESTFS
 
 log_note "Verify file checksum:"
 typeset checksum1=$(sha256digest /$TESTPOOL/$TESTFS/payload)

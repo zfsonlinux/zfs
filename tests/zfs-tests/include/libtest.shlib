@@ -4224,3 +4224,22 @@ function wait_for_children #children
 	done
 	return $rv
 }
+
+#
+# Compare two directory trees recursively in a manner similar to diff(1), but
+# using rsync. If there are any discrepancies, a summary of the differences are
+# output and a non-zero error is returned.
+#
+function directory_diff # dir_a dir_b
+{
+	# Run rsync with --dry-run --itemize-changes to get something akin to diff
+	# output, but rsync is far more thorough in detecting differences (diff
+	# doesn't compare file metadata, and cannot handle special files).
+	diff="$(rsync -ni -acAHX --delete "$1/" "$2/")"
+	rv=0
+	if [ -n "$diff" ]; then
+		echo "$diff"
+		rv=1
+	fi
+	return $rv
+}

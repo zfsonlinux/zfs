@@ -456,14 +456,13 @@ zpl_rename2(struct inode *sdip, struct dentry *sdentry,
 	int error;
 	fstrans_cookie_t cookie;
 
-	/* We don't have renameat2(2) support */
-	if (flags)
+	if (flags & ~(RENAME_NOREPLACE | RENAME_EXCHANGE | RENAME_WHITEOUT))
 		return (-EINVAL);
 
 	crhold(cr);
 	cookie = spl_fstrans_mark();
 	error = -zfs_rename(ITOZ(sdip), dname(sdentry), ITOZ(tdip),
-	    dname(tdentry), cr, 0);
+	    dname(tdentry), cr, flags);
 	spl_fstrans_unmark(cookie);
 	crfree(cr);
 	ASSERT3S(error, <=, 0);
@@ -471,7 +470,9 @@ zpl_rename2(struct inode *sdip, struct dentry *sdentry,
 	return (error);
 }
 
-#if !defined(HAVE_RENAME_WANTS_FLAGS) && !defined(HAVE_IOPS_RENAME_USERNS)
+#if !defined(HAVE_IOPS_RENAME_USERNS) && \
+	!defined(HAVE_RENAME_WANTS_FLAGS) && \
+	!defined(HAVE_RENAME2)
 static int
 zpl_rename(struct inode *sdip, struct dentry *sdentry,
     struct inode *tdip, struct dentry *tdentry)
@@ -727,7 +728,12 @@ const struct inode_operations zpl_inode_operations = {
 #endif /* CONFIG_FS_POSIX_ACL */
 };
 
+#ifdef HAVE_RENAME2_OPERATIONS_WRAPPER
+const struct inode_operations_wrapper zpl_dir_inode_operations = {
+	.ops = {
+#else
 const struct inode_operations zpl_dir_inode_operations = {
+#endif
 	.create		= zpl_create,
 	.lookup		= zpl_lookup,
 	.link		= zpl_link,
@@ -736,7 +742,9 @@ const struct inode_operations zpl_dir_inode_operations = {
 	.mkdir		= zpl_mkdir,
 	.rmdir		= zpl_rmdir,
 	.mknod		= zpl_mknod,
-#if defined(HAVE_RENAME_WANTS_FLAGS) || defined(HAVE_IOPS_RENAME_USERNS)
+#ifdef HAVE_RENAME2
+	.rename2	= zpl_rename2,
+#elif defined(HAVE_RENAME_WANTS_FLAGS) || defined(HAVE_IOPS_RENAME_USERNS)
 	.rename		= zpl_rename2,
 #else
 	.rename		= zpl_rename,
@@ -758,6 +766,10 @@ const struct inode_operations zpl_dir_inode_operations = {
 #endif /* HAVE_SET_ACL */
 	.get_acl	= zpl_get_acl,
 #endif /* CONFIG_FS_POSIX_ACL */
+#ifdef HAVE_RENAME2_OPERATIONS_WRAPPER
+	},
+	.rename2	= zpl_rename2,
+#endif
 };
 
 const struct inode_operations zpl_symlink_inode_operations = {
