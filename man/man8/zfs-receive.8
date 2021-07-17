@@ -29,7 +29,7 @@
 .\" Copyright 2018 Nexenta Systems, Inc.
 .\" Copyright 2019 Joyent, Inc.
 .\"
-.Dd February 16, 2020
+.Dd June 18, 2021
 .Dt ZFS-RECEIVE 8
 .Os
 .
@@ -57,6 +57,11 @@
 .Fl A
 .Ar filesystem Ns | Ns Ar volume
 .
+.Nm
+.Cm receive
+.Fl c
+.Op Fl vn
+.Ar snapshot Ns
 .Sh DESCRIPTION
 .Bl -tag -width ""
 .It Xo
@@ -391,8 +396,25 @@ restrictions (e.g. set-once) apply equally to
 .Ar filesystem Ns | Ns Ar volume
 .Xc
 Abort an interrupted
-.Nm zfs Cm receive Fl s ,
 deleting its saved partially received state.
+.It Xo
+.Nm zfs
+.Cm receive
+.Fl c
+.Op Fl vn
+.Ar snapshot
+.Xc
+Attempt to correct data corruption in the specified
+.Sy snapshot ,
+by using the provided stream as the source of healthy data.
+This method of healing can only heal data blocks present in the stream.
+Metadata can not be healed by corrective receive.
+Running a scrub is recommended post healing to ensure all corruption had
+been healed.
+It's important to consider why corruption has happened in the first place
+since if you have slowly failing hardware periodically healing the data
+is not going to save you from data loss later on when the hardware fails
+completely.
 .El
 .
 .Sh SEE ALSO

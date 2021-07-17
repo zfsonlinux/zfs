@@ -212,6 +212,7 @@
     <elf-symbol name='lzc_receive_resumable' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='lzc_receive_with_cmdprops' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='lzc_receive_with_header' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
+    <elf-symbol name='lzc_receive_with_heal' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='lzc_redact' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='lzc_release' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='lzc_rename' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
@@ -1549,6 +1550,26 @@
       <parameter type-id='type-id-34' name='wkeylen'/>
       <parameter type-id='type-id-16' name='origin'/>
       <parameter type-id='type-id-41' name='force'/>
+      <parameter type-id='type-id-41' name='resumable'/>
+      <parameter type-id='type-id-41' name='raw'/>
+      <parameter type-id='type-id-1' name='input_fd'/>
+      <parameter type-id='type-id-111' name='begin_record'/>
+      <parameter type-id='type-id-1' name='cleanup_fd'/>
+      <parameter type-id='type-id-71' name='read_bytes'/>
+      <parameter type-id='type-id-71' name='errflags'/>
+      <parameter type-id='type-id-71' name='action_handle'/>
+      <parameter type-id='type-id-64' name='errors'/>
+      <return type-id='type-id-1'/>
+    </function-decl>
+    <function-decl name='lzc_receive_with_heal' mangled-name='lzc_receive_with_heal' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='lzc_receive_with_heal'>
+      <parameter type-id='type-id-16' name='snapname'/>
+      <parameter type-id='type-id-29' name='props'/>
+      <parameter type-id='type-id-29' name='cmdprops'/>
+      <parameter type-id='type-id-33' name='wkeydata'/>
+      <parameter type-id='type-id-34' name='wkeylen'/>
+      <parameter type-id='type-id-16' name='origin'/>
+      <parameter type-id='type-id-41' name='force'/>
+      <parameter type-id='type-id-41' name='heal'/>
       <parameter type-id='type-id-41' name='resumable'/>
       <parameter type-id='type-id-41' name='raw'/>
       <parameter type-id='type-id-1' name='input_fd'/>
