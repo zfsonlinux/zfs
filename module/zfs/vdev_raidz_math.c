@@ -61,7 +61,7 @@ const raidz_impl_ops_t *raidz_all_maths[] = {
 #if defined(__x86_64) && defined(HAVE_AVX512BW)	/* only x86_64 for now */
 	&vdev_raidz_avx512bw_impl,
 #endif
-#if defined(__aarch64__) && !defined(__FreeBSD__)
+#if defined(__aarch64__) && !defined(__FreeBSD__) && !defined(__APPLE__)
 	&vdev_raidz_aarch64_neon_impl,
 	&vdev_raidz_aarch64_neonx2_impl,
 #endif
@@ -626,6 +626,32 @@ vdev_raidz_impl_set(const char *val)
 	}
 
 	return (err);
+}
+
+int
+vdev_raidz_impl_get(char *buffer, size_t max)
+{
+	int i, cnt = 0;
+	char *fmt;
+	const uint32_t impl = RAIDZ_IMPL_READ(zfs_vdev_raidz_impl);
+
+	ASSERT(raidz_math_initialized);
+
+	/* list mandatory options */
+	for (i = 0; i < ARRAY_SIZE(math_impl_opts) - 2; i++) {
+		fmt = (impl == math_impl_opts[i].sel) ? "[%s] " : "%s ";
+		cnt += snprintf(buffer + cnt, max - cnt, fmt,
+		    math_impl_opts[i].name);
+	}
+
+	/* list all supported implementations */
+	for (i = 0; i < raidz_supp_impl_cnt; i++) {
+		fmt = (i == impl) ? "[%s] " : "%s ";
+		cnt += snprintf(buffer + cnt, max - cnt, fmt,
+		    raidz_supp_impl[i]->name);
+	}
+
+	return (cnt);
 }
 
 #if defined(_KERNEL) && defined(__linux__)

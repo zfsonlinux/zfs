@@ -14,6 +14,9 @@ endif
 if BUILD_LINUX
 DEFAULT_INCLUDES += -I$(top_srcdir)/include/os/linux/zfs
 endif
+if BUILD_MACOS
+DEFAULT_INCLUDES += -I$(top_srcdir)/include/os/macos/zfs
+endif
 
 USER_C = \
 	lzbe_device.c \
@@ -29,8 +32,10 @@ libzfsbootenv_la_LIBADD = \
 
 libzfsbootenv_la_LDFLAGS =
 
+if !BUILD_MACOS
 if !ASAN_ENABLED
 libzfsbootenv_la_LDFLAGS += -Wl,-z,defs
+endif
 endif
 
 libzfsbootenv_la_LDFLAGS += -version-info 1:0:0

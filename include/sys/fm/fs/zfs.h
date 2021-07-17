@@ -119,6 +119,11 @@ extern "C" {
 #define	FM_RESOURCE_AUTOREPLACE			"autoreplace"
 #define	FM_RESOURCE_STATECHANGE			"statechange"
 
+#define	FM_RESOURCE_ZFS_SNAPSHOT_MOUNT		"snapshot_mount"
+#define	FM_RESOURCE_ZFS_SNAPSHOT_UNMOUNT		"snapshot_unmount"
+#define	FM_RESOURCE_ZVOL_CREATE_SYMLINK		"zvol.create"
+#define	FM_RESOURCE_ZVOL_REMOVE_SYMLINK		"zvol.remove"
+
 #ifdef	__cplusplus
 }
 #endif

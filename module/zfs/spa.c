@@ -1065,6 +1065,27 @@ spa_taskqs_init(spa_t *spa, zio_type_t t, zio_taskq_type_t q)
 				pri++;
 #elif defined(__FreeBSD__)
 				pri += 4;
+#elif defined(__APPLE__)
+				pri -= 4;
+#if defined(_KERNEL)
+			} else {
+				/*
+				 * we want to be below maclsyspri for zio
+				 * taskqs on macOS, to avoid starving out
+				 * base=81 (maxclsyspri) kernel tasks when
+				 * doing computation-intensive checksums etc.
+				 */
+				pri -= 1;
+			}
+			/* macOS cannot handle TASKQ_DYNAMIC zio taskqs */
+
+			if ((flags & (TASKQ_DC_BATCH|TASKQ_DUTY_CYCLE)) == 0)
+				flags |= TASKQ_TIMESHARE;
+
+			if (flags & TASKQ_DYNAMIC) {
+				flags &= ~TASKQ_DYNAMIC;
+				/* fallthrough to closing brace after #endif */
+#endif
 #else
 #error "unknown OS"
 #endif
@@ -1307,6 +1328,10 @@ spa_activate(spa_t *spa, spa_mode_t mode)
 	    spa_error_entry_compare, sizeof (spa_error_entry_t),
 	    offsetof(spa_error_entry_t, se_avl));
 
+#if defined(_KERNEL) && defined(__APPLE__)
+	spa_activate_os(spa);
+#endif
+
 	spa_keystore_init(&spa->spa_keystore);
 
 	/*
@@ -1443,6 +1468,11 @@ spa_deactivate(spa_t *spa)
 		thread_join(spa->spa_did);
 		spa->spa_did = 0;
 	}
+
+#if defined(_KERNEL) && defined(__APPLE__)
+	spa_deactivate_os(spa);
+#endif
+
 }
 
 /*
@@ -6007,6 +6037,10 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_minref = zfs_refcount_count(&spa->spa_refcount);
 	spa->spa_load_state = SPA_LOAD_NONE;
 
+#if defined(__APPLE__) && defined(_KERNEL)
+	spa_create_os(spa);
+#endif
+
 	mutex_exit(&spa_namespace_lock);
 
 	return (0);
@@ -6189,6 +6223,10 @@ spa_import(char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	spa_event_notify(spa, NULL, NULL, ESC_ZFS_POOL_IMPORT);
 
 	mutex_exit(&spa_namespace_lock);
+
+#if defined(__APPLE__) && defined(_KERNEL)
+	spa_create_os(spa);
+#endif
 
 	zvol_create_minors_recursive(pool);
 
@@ -6423,6 +6461,10 @@ spa_export_common(const char *pool, int new_state, nvlist_t **oldconfig,
 	}
 
 export_spa:
+#if defined(__APPLE__) && defined(_KERNEL)
+	spa_export_os(spa);
+#endif
+
 	if (new_state == POOL_STATE_DESTROYED)
 		spa_event_notify(spa, NULL, NULL, ESC_ZFS_POOL_DESTROY);
 	else if (new_state == POOL_STATE_EXPORTED)

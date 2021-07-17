@@ -1,12 +1,16 @@
 # NB: GNU Automake Manual, Chapter 8.3.5: Libtool Convenience Libraries
 # These nine libraries are intermediary build components.
-SUBDIRS = libavl libicp libshare libspl libtpool libzstd
+SUBDIRS = libavl libicp libshare libspl libtpool libzstd os
 CPPCHECKDIRS  = libavl libicp libnvpair libshare libspl libtpool libunicode
 CPPCHECKDIRS += libuutil libzfs libzfs_core libzfsbootenv libzpool libzutil
 
 if BUILD_LINUX
 SUBDIRS += libefi
 CPPCHECKDIRS += libefi
+endif
+
+if BUILD_MACOS
+SUBDIRS += libefi
 endif
 
 # libnvpair is installed as part of the final build product

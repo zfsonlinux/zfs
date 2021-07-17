@@ -187,7 +187,7 @@ static const fletcher_4_ops_t *fletcher_4_impls[] = {
 #if defined(__x86_64) && defined(HAVE_AVX512BW)
 	&fletcher_4_avx512bw_ops,
 #endif
-#if defined(__aarch64__) && !defined(__FreeBSD__)
+#if defined(__aarch64__) && !defined(__FreeBSD__) && !defined(__APPLE__)
 	&fletcher_4_aarch64_neon_ops,
 #endif
 };
@@ -408,6 +408,27 @@ fletcher_4_impl_set(const char *val)
 	}
 
 	return (err);
+}
+
+int
+fletcher_4_get(char *buffer, size_t max)
+{
+	const uint32_t impl = IMPL_READ(fletcher_4_impl_chosen);
+	char *fmt;
+	int i, cnt = 0;
+
+	/* list fastest */
+	fmt = (impl == IMPL_FASTEST) ? "[%s] " : "%s ";
+	cnt += snprintf(buffer + cnt, max - cnt, fmt, "fastest");
+
+	/* list all supported implementations */
+	for (i = 0; i < fletcher_4_supp_impls_cnt; i++) {
+		fmt = (i == impl) ? "[%s] " : "%s ";
+		cnt += snprintf(buffer + cnt, max - cnt, fmt,
+		    fletcher_4_supp_impls[i]->name);
+	}
+
+	return (cnt);
 }
 
 /*
@@ -889,7 +910,7 @@ zio_abd_checksum_func_t fletcher_4_abd_ops = {
 
 #define	IMPL_FMT(impl, i)	(((impl) == (i)) ? "[%s] " : "%s ")
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
 
 static int
 fletcher_4_param_get(char *buffer, zfs_kernel_param_t *unused)
@@ -925,7 +946,7 @@ fletcher_4_param_set(const char *val, zfs_kernel_param_t *unused)
 static int
 fletcher_4_param(ZFS_MODULE_PARAM_ARGS)
 {
-	int err;
+	int err = 0;
 
 	if (req->newptr == NULL) {
 		const uint32_t impl = IMPL_READ(fletcher_4_impl_chosen);
@@ -946,7 +967,11 @@ fletcher_4_param(ZFS_MODULE_PARAM_ARGS)
 			    fletcher_4_supp_impls[i]->name);
 		}
 
+#ifdef __APPLE__
+		sbuf_finish(s);
+#else
 		err = sbuf_finish(s);
+#endif
 		sbuf_delete(s);
 
 		return (err);

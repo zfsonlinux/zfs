@@ -41,6 +41,9 @@
 #include <libzutil.h>
 #include <libzfs.h>
 #include <string.h>
+#ifdef __APPLE__
+#include <libgen.h>
+#endif
 
 #include "zfs_agents.h"
 #include "fmd_api.h"

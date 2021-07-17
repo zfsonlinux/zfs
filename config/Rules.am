@@ -21,6 +21,11 @@ DEFAULT_INCLUDES += \
 	-I$(top_srcdir)/lib/libspl/include/os/freebsd
 endif
 
+if BUILD_MACOS
+DEFAULT_INCLUDES += \
+	-I$(top_srcdir)/lib/libspl/include/os/macos
+endif
+
 AM_LIBTOOLFLAGS = --silent
 
 AM_CFLAGS  = -std=gnu99 -Wall -Wstrict-prototypes -Wmissing-prototypes
@@ -52,6 +57,10 @@ endif
 if BUILD_FREEBSD
 AM_CPPFLAGS += -DTEXT_DOMAIN=\"zfs-freebsd-user\"
 endif
+if BUILD_MACOS
+AM_CPPFLAGS += -DTEXT_DOMAIN=\"zfs-macos-user\"
+endif
+
 AM_CPPFLAGS += -D"strtok(...)=strtok(__VA_ARGS__) __attribute__((deprecated(\"Use strtok_r(3) instead!\")))"
 AM_CPPFLAGS += -D"__xpg_basename(...)=__xpg_basename(__VA_ARGS__) __attribute__((deprecated(\"basename(3) is underspecified. Use zfs_basename() instead!\")))"
 AM_CPPFLAGS += -D"basename(...)=basename(__VA_ARGS__) __attribute__((deprecated(\"basename(3) is underspecified. Use zfs_basename() instead!\")))"
@@ -65,3 +74,4 @@ AM_LDFLAGS += -fstack-protector-strong -shared
 AM_LDFLAGS += -Wl,-x -Wl,--fatal-warnings -Wl,--warn-shared-textrel
 AM_LDFLAGS += -lm
 endif
+

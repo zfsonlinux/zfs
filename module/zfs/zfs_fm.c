@@ -1444,6 +1444,48 @@ zfs_ereport_fini(void)
 	mutex_destroy(&recent_events_lock);
 }
 
+void
+zfs_ereport_snapshot_post(const char *subclass, spa_t *spa, const char *name)
+{
+	nvlist_t *aux;
+
+	aux = fm_nvlist_create(NULL);
+	nvlist_add_string(aux, "snapshot_name", name);
+
+	zfs_post_common(spa, NULL, FM_RSRC_CLASS, subclass, aux);
+	fm_nvlist_destroy(aux, FM_NVA_FREE);
+}
+
+void
+zfs_ereport_zvol_post(const char *subclass, const char *name, const char *bsd,
+    const char *rbsd)
+{
+	nvlist_t *aux;
+	char *r;
+	spa_t *spa;
+	boolean_t has_lock = B_FALSE;
+
+	has_lock = mutex_owned(&spa_namespace_lock);
+	if (!has_lock) mutex_enter(&spa_namespace_lock);
+	spa = spa_lookup(name);
+	if (!has_lock) mutex_exit(&spa_namespace_lock);
+	if (!spa)
+		return;
+
+	aux = fm_nvlist_create(NULL);
+	nvlist_add_string(aux, "BSD_disk", bsd);
+	nvlist_add_string(aux, "BSD_rdisk", rbsd);
+	r = strchr(name, '/');
+	if (r && r[1])
+		nvlist_add_string(aux, "DATASET", &r[1]);
+
+	zfs_post_common(spa, NULL, FM_RSRC_CLASS, subclass, aux);
+	fm_nvlist_destroy(aux, FM_NVA_FREE);
+}
+
+#endif
+
+#if defined(_KERNEL)
 EXPORT_SYMBOL(zfs_ereport_post);
 EXPORT_SYMBOL(zfs_ereport_is_valid);
 EXPORT_SYMBOL(zfs_ereport_post_checksum);

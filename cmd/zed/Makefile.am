@@ -45,7 +45,10 @@ zed_LDADD = \
 	$(abs_top_builddir)/lib/libnvpair/libnvpair.la \
 	$(abs_top_builddir)/lib/libuutil/libuutil.la
 
+if !BUILD_MACOS
 zed_LDADD += -lrt $(LIBATOMIC_LIBS) $(LIBUDEV_LIBS) $(LIBUUID_LIBS)
+endif
+
 zed_LDFLAGS = -pthread
 
 EXTRA_DIST = agents/README.md

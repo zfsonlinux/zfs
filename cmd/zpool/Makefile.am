@@ -22,6 +22,10 @@ if BUILD_LINUX
 zpool_SOURCES += os/linux/zpool_vdev_os.c
 endif
 
+if BUILD_MACOS
+zpool_SOURCES += os/macos/zpool_vdev_os.c
+endif
+
 zpool_LDADD = \
 	$(abs_top_builddir)/lib/libzfs/libzfs.la \
 	$(abs_top_builddir)/lib/libzfs_core/libzfs_core.la \
@@ -181,7 +185,7 @@ install-data-hook:
 	for f in $(zpoolconfdefaults); do \
 	  test -f "$(DESTDIR)$(zpoolconfdir)/$${f}" -o \
 	       -L "$(DESTDIR)$(zpoolconfdir)/$${f}" || \
-	    ln -s "$(zpoolexecdir)/$${f}" "$(DESTDIR)$(zpoolconfdir)"; \
+	    ln -sf "$(zpoolexecdir)/$${f}" "$(DESTDIR)$(zpoolconfdir)"; \
 	done
 	for l in $(zpoolcompatlinks); do \
 		(cd "$(DESTDIR)$(zpoolcompatdir)"; ln -sf $${l} ); \
